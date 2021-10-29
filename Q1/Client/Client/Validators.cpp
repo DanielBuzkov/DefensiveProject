@@ -71,6 +71,11 @@ const bool Name::IsEqual(const std::string& otherName) const {
 	return memcmp(m_data, otherName.c_str(), otherName.length()) == 0;
 }
 
+void Name::Reset() {
+	m_isInit = false;
+	memset(m_data, 0, sizeof(m_data));
+}
+
 bool UUID::FromFile(const std::string data) {
 
 	// Invalid size for given data.

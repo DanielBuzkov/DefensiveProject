@@ -315,7 +315,7 @@ bool Client::UpdateMeInfo(uuid_t newUuid) {
 	infoFile.open(ME_INFO_PATH);
 
 	// Making sure the given UUID is valid and updating the field.
-	if (m_uuid.Deserialize((const char*)newUuid, sizeof(newUuid)) == false) {
+	if (m_uuid.Deserialize((const char*)newUuid, sizeof(uuid_t)) == false) {
 		std::cout << "Invalid UUID" << std::endl;
 		return false;
 	}
@@ -390,6 +390,7 @@ Client::ReturnStatus Client::HandleRegister() {
 
 	if (m_name.Serialize(request.body.name, sizeof(request.body.name)) == false) {
 		std::cout << "Failed serializing name to message" << std::endl;
+		m_name.Reset();
 		return ReturnStatus::GeneralError;
 	}
 
@@ -412,6 +413,8 @@ Client::ReturnStatus Client::HandleRegister() {
 			m_publicKey = nullptr;
 			m_privateKey = nullptr;
 
+			m_name.Reset();
+
 			std::cout << "Failed updating UUID from server" << std::endl;
 			return ReturnStatus::GeneralError;
 		}
@@ -425,6 +428,8 @@ Client::ReturnStatus Client::HandleRegister() {
 
 		m_publicKey = nullptr;
 		m_privateKey = nullptr;
+
+		m_name.Reset();
 	}
 
 	return ret;

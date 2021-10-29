@@ -39,10 +39,10 @@ enum class Opcode : uint16_t {
 	only received and thus only the default c'tor shall be used.
 */
 
-template<Opcode _code, uint32_t _size>
+template<Opcode _code, size_t _size>
 class RequestHeader {
 public:
-	RequestHeader(UUID _uuid) : version(CLIENT_VERSION), code((uint16_t)_code), payloadSize(_size) {
+	RequestHeader(UUID _uuid) : version(CLIENT_VERSION), code((uint16_t)_code), payloadSize((uint32_t)_size) {
 		if (_uuid.Serialize(clientId, sizeof(clientId)) == false) {
 			throw std::invalid_argument("Unable to handle currnt UUID for messages");
 		}
@@ -69,7 +69,7 @@ public:
 	}
 };
 
-template<Opcode _code, uint32_t _size>
+template<Opcode _code, size_t _size>
 class ResponseHeader {
 public:
 	ResponseHeader() : version(0), code(0), payloadSize(0) {}
@@ -87,9 +87,14 @@ public:
 		memcpy((uint8_t*)&code, o_buffer + sizeof(version), sizeof(code));
 		memcpy((uint8_t*)&payloadSize, o_buffer + sizeof(version) + sizeof(code), sizeof(payloadSize));
 
-		if (version != CLIENT_VERSION ||
-			code != (uint16_t)_code ||
-			payloadSize != _size) {
+		// Failure header shall still be accepted
+		if (code == (uint16_t)Opcode::ResponseFailure) {
+			return true;
+		}
+
+		// Server's version should not bother the client
+		if (code != (uint16_t)_code ||
+			payloadSize != (uint32_t)_size) {
 			
 			version = 0;
 			code = 0;
@@ -112,7 +117,7 @@ public:
 	StaticRequest(UUID _uuid) : header(_uuid) {}
 	StaticRequest() : header() {}
 
-	RequestHeader<_code, sizeof(Body)> header;
+	RequestHeader<_code, Body::GetSize()> header;
 	Body body;
 
 	const bool Serialize(uint8_t* o_buffer, size_t buffSize) const {
@@ -134,7 +139,7 @@ public:
 template<Opcode _code, typename Body>
 class StaticResponse {
 public:
-	ResponseHeader<_code, sizeof(Body)> header;
+	ResponseHeader<_code, Body::GetSize()> header;
 	Body body;
 
 	bool Desrialize(uint8_t* o_buffer, size_t buffSize) {

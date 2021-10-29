@@ -45,6 +45,8 @@ public:
 
 	const bool IsEqual(const std::string& otherName) const;
 
+	void Reset();
+
 private:
 	bool m_isInit;
 	name_t m_data;
