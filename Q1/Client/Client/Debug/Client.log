@@ -1,0 +1,20 @@
+﻿  AESWrapper.cpp
+  Base64Wrapper.cpp
+  Client.cpp
+  Please define _WIN32_WINNT or _WIN32_WINDOWS appropriately. For example:
+  - add -D_WIN32_WINNT=0x0601 to the compiler command line; or
+  - add _WIN32_WINNT=0x0601 to your project's Preprocessor Definitions.
+  Assuming _WIN32_WINNT=0x0601 (i.e. Windows 7 target).
+C:\Users\User\Documents\Uni - Copy\2021ג\תכנות דפנסיבי\ממן15\Q1\Client\Client\Client.cpp(233,11): warning C4244: '=': conversion from 'uint64_t' to 'uint16_t', possible loss of data
+  Friend.cpp
+  main.cpp
+  Please define _WIN32_WINNT or _WIN32_WINDOWS appropriately. For example:
+  - add -D_WIN32_WINNT=0x0601 to the compiler command line; or
+  - add _WIN32_WINNT=0x0601 to your project's Preprocessor Definitions.
+  Assuming _WIN32_WINNT=0x0601 (i.e. Windows 7 target).
+  RSAWrapper.cpp
+  SystemUtils.cpp
+  The contents of <filesystem> are available only with C++17 or later.
+  Validators.cpp
+  Generating Code...
+  Client.vcxproj -> C:\Users\User\Documents\Uni - Copy\2021ג\תכנות דפנסיבי\ממן15\Q1\Client\Debug\Client.exe
