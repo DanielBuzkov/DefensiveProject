@@ -143,7 +143,7 @@ public:
 	Body body;
 
 	bool Desrialize(uint8_t* o_buffer, size_t buffSize) {
-		if (buffSize != sizeof(header) + sizeof(Body)) {
+		if (buffSize != sizeof(header) + Body::GetSize()) {
 			return false;
 		}
 
@@ -151,7 +151,7 @@ public:
 			return false;
 		}
 
-		memcpy(&body, o_buffer + sizeof(header), sizeof(body));
+		memcpy(&body, o_buffer + sizeof(header), Body::GetSize());
 
 		return true;
 	}

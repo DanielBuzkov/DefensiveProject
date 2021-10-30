@@ -112,12 +112,7 @@ bool UUID::FromFile(const std::string data) {
 	return true;
 }
 
-bool UUID::ToFile(uint8_t* buffer, const size_t buffSize) const {
-
-	// Invalid size for given data.
-	if (buffSize != CHARS_PER_BYTE * sizeof(m_data)) {
-		return false;
-	}
+bool UUID::ToFile(std::string &o_string) const {
 
 	// Unable to copy data, since the instance has no data.
 	if (m_isInit != true) {
@@ -131,8 +126,8 @@ bool UUID::ToFile(uint8_t* buffer, const size_t buffSize) const {
 		auto high = (m_data[i] >> NIBBLE_LEN_IN_BITS) & LOW_NIBBLE;
 		auto low = m_data[i] & LOW_NIBBLE;
 
-		buffer[CHARS_PER_BYTE * i] = digits[high];
-		buffer[(CHARS_PER_BYTE * i) + 1] = digits[low];
+		o_string += digits[high];
+		o_string += digits[low];
 	}
 
 	return true;

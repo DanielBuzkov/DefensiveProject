@@ -124,12 +124,14 @@ Client::MenuOptions Client::GetMenuChoise() {
 
 	uint16_t userInput = 0;
 
+	std::cout << "--------------------------------" << std::endl;
 	std::cout << "MessageU client at your service." << std::endl;
 
 	while(true) {
 		PrintOption();
 		std::cin >> userInput;
 
+		// Making sure the choise is in the whitelist.
 		if (userInput != (uint16_t)Client::MenuOptions::Register &&
 			userInput != (uint16_t)Client::MenuOptions::ClientList &&
 			userInput != (uint16_t)Client::MenuOptions::PublicKey &&
@@ -138,7 +140,7 @@ Client::MenuOptions Client::GetMenuChoise() {
 			userInput != (uint16_t)Client::MenuOptions::GetSymKey &&
 			userInput != (uint16_t)Client::MenuOptions::SendSymKey &&
 			userInput != (uint16_t)Client::MenuOptions::Exit) {
-			// (I hate c++) Upon casting exception we can be sure the user hasnt entered a valid option.
+			// (I hate c++ and its un-iterable enums.)
 			std::cout << "Invalid option, please try choosing from the menu again." << std::endl;
 			continue;
 		}
@@ -304,19 +306,21 @@ bool Client::ParseMeInfo() {
 
 bool Client::UpdateMeInfo(uuid_t newUuid) {
 	
-	std::fstream infoFile;
-
 	if (m_isInit == true) {
 		std::cout << "User is already init" << std::endl;
 		return false;
 	}
 
-	// Openning file for reading.
-	infoFile.open(ME_INFO_PATH);
-
 	// Making sure the given UUID is valid and updating the field.
 	if (m_uuid.Deserialize((const char*)newUuid, sizeof(uuid_t)) == false) {
 		std::cout << "Invalid UUID" << std::endl;
+		return false;
+	}
+
+	std::string uuidString;
+	
+	if (m_uuid.ToFile(uuidString) == false) {
+		std::cout << "Unable to get UUID" << std::endl;
 		return false;
 	}
 
@@ -327,11 +331,17 @@ bool Client::UpdateMeInfo(uuid_t newUuid) {
 		return false;
 	}
 
+	// Remove newlines from string.
+	std::string encodedPrivateKey = Base64Wrapper::encode(m_privateKey->getPrivateKey());
+	encodedPrivateKey.erase(std::remove(encodedPrivateKey.begin(), encodedPrivateKey.end(), '\n'), encodedPrivateKey.end());
+
 	m_isInit = true;
 
-	infoFile << nameBuffer;
-	infoFile << newUuid;
-	infoFile << Base64Wrapper::encode(m_privateKey->getPrivateKey());
+	std::ofstream infoFile(ME_INFO_PATH);
+
+	infoFile << nameBuffer << std::endl;
+	infoFile << uuidString << std::endl;
+	infoFile << encodedPrivateKey;
 
 	infoFile.close();
 
@@ -436,7 +446,7 @@ Client::ReturnStatus Client::HandleRegister() {
 }
 
 Client::ReturnStatus Client::HandleList() {
-		RequestList request(m_uuid);
+	RequestList request(m_uuid);
 
 	return Client::ReturnStatus::GeneralError;
 }

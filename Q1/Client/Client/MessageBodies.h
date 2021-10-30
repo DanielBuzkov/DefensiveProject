@@ -12,23 +12,6 @@ enum class MessageType : uint8_t {
 
 #pragma pack(push, 1)
 
-// MESSAGES BETWEEN CLIENTS:
-// Type 1
-typedef struct _EmptyMessage {
-	static constexpr size_t GetSize() {
-		return 0;
-	}
-} EmptyMessage;
-
-// Type 2
-typedef struct _SendSymKeyMessage {
-	symkey_t symKey;
-
-	static constexpr size_t GetSize() {
-		return sizeof(symKey);
-	}
-} SendSymKeyMessage;
-
 // TODO : ADD MORE MESSAGE TYPES (dynamic ones)
 
 // REQUESTS:
@@ -54,9 +37,9 @@ typedef struct _RequestPKBody {
 } RequestPKBody;
 
 // Opcode 1003
-template <MessageType _type, size_t _size, typename Content>
+template <MessageType _type, typename Content>
 struct MessageToClient {
-	MessageToClient() : messageType((uint8_t)_type), contentSize(_size) {}
+	MessageToClient() : messageType((uint8_t)_type), contentSize(Content::GetSize()) {}
 
 	uuid_t uuid;
 	uint8_t messageType;
@@ -68,8 +51,24 @@ struct MessageToClient {
 	}
 };
 
-typedef MessageToClient<MessageType::GetSymKey, 0, EmptyMessage> RequestGetSymKeyBody;
-typedef MessageToClient<MessageType::SendSymKey, sizeof(SendSymKeyMessage), SendSymKeyMessage> RequestSendSymKeyBody;
+// Type 1
+typedef struct _EmptyMessage {
+	static constexpr size_t GetSize() {
+		return 0;
+	}
+} EmptyMessage;
+
+// Type 2
+typedef struct _SendSymKeyMessage {
+	symkey_t symKey;
+
+	static constexpr size_t GetSize() {
+		return sizeof(symKey);
+	}
+} SendSymKeyMessage;
+
+typedef MessageToClient<MessageType::GetSymKey, EmptyMessage> RequestGetSymKeyBody;
+typedef MessageToClient<MessageType::SendSymKey, SendSymKeyMessage> RequestSendSymKeyBody;
 //MORE
 //MORE
 

@@ -80,7 +80,7 @@ public:
 
 		@return	bool	-	True is serialized succesfuly, false otherwise.
 	*/
-	bool ToFile(uint8_t* buffer, const size_t buffLen) const;
+	bool ToFile(std::string &o_string) const;
 
 	bool Deserialize(const char* buffer, const size_t buffLen);
 
