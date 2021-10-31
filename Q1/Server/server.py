@@ -1,48 +1,58 @@
 #Server version 2
 
 from utils import sql_utils
-import socket, threading
-from os import path
+import socket
+import os
 
-import client_handler
+from client_handler import ClientHandler
 
-DEFAULT_PORT = "1234"
 PORT_FILE_PATH = "port.info"
+MAX_PORT_VALUE = 65535
 
 
 def get_port():
-	try:
-		if not path.isfile((PORT_FILE_PATH)):
-			with open(PORT_FILE_PATH, "x") as file:
-				file.write(DEFAULT_PORT)
-				return int(DEFAULT_PORT)
+	# if the file doesn't exist.
+	if not os.path.isfile(PORT_FILE_PATH):
+		raise ValueError("Info file can't be open (does file exists?)")
 
-		with open(PORT_FILE_PATH, "r") as file:
-			# If the port number is invalid then the binding will fail later.
-			return int(file.read())
+	with open(PORT_FILE_PATH, 'r') as portFile:
+		data = portFile.read().split()
 
-	# Let other exception raise higher
-	except ValueError:
-		print("Hello")
-		# TODO: Handle invalid value in existing file
+	# The file should contain one word.
+	if len(data) != 1:
+		raise ValueError("Invalid info file format")
+
+	# Cast string to port and initialize the server.
+	port = int(data[0])
+
+	# Validate read value.
+	if port < 1 or port > MAX_PORT_VALUE:
+		raise ValueError("Invalid port value")
+
+	return port
 
 
-def run_server(port_number : int):
-	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-	server.bind(("0.0.0.0", port_number))
+def run_server(port_number: int):
+	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	sock.bind(("0.0.0.0", port_number))
+	sock.listen(50)
 
-	threads = []
+	handler = ClientHandler()
 
 	while True:
-		server.listen(1)
-		connection, address = server.accept()
-		new_thread = client_handler.ClientThread(connection)
-		new_thread.start()
-		threads.append(new_thread)
+		client_socket, addr = sock.accept()
+
+		handler.handle_client(client_socket)
+
+		client_socket.close()
+
+		# new_thread = client_handler.ClientThread(connection)
+		# new_thread.start()
+		# threads.append(new_thread)
+
+	sock.close()
 
 
 if __name__ == '__main__':
 	port = get_port()
-	sql_utils.init()
 	run_server(port)

@@ -84,9 +84,9 @@ private:
 
 	bool UpdateMeInfo(uuid_t newUuid);
 
-	bool SendToServer(uint8_t* buffer, size_t buffSize);
-
 	bool ChooseClientFromList(Friend* o_otherClient);
+
+	bool FriendExists(std::string name);
 
 	ReturnStatus HandleRegister();
 	ReturnStatus HandleList();

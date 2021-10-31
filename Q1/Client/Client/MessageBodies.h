@@ -92,10 +92,15 @@ typedef struct _ResponseRegisterBody {
 } ResponseRegisterBody;
 
 // Opcode 2001
-/*typedef struct {
+typedef struct _ResponseUsersListNode {
 	uuid_t uuid;
 	name_t name;
-} ;*/
+
+	static constexpr size_t GetSize() {
+		return sizeof(uuid) + sizeof(name);
+	}
+
+} ResponseUsersListNode;
 
 // Opcode 2002
 typedef struct _ResponsePKBody {

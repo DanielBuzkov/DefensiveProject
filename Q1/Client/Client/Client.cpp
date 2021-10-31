@@ -350,9 +350,7 @@ bool Client::UpdateMeInfo(uuid_t newUuid) {
 
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DONE ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv NEEDS WORK vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-bool Client::SendToServer(uint8_t* buffer, size_t buffSize) {
-	return false;
-}
+
 
 bool Client::ChooseClientFromList(Friend* o_otherClient) {
 	if (m_friends.size() == 0) {
@@ -368,6 +366,16 @@ bool Client::ChooseClientFromList(Friend* o_otherClient) {
 	for (Friend currFriend : m_friends) {
 		if (currFriend.IsNameEqual(name) == true) {
 			o_otherClient = &currFriend;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool Client::FriendExists(std::string name) {
+	for (Friend currFriend : m_friends) {
+		if (currFriend.IsNameEqual(name) == true) {
 			return true;
 		}
 	}
@@ -447,8 +455,82 @@ Client::ReturnStatus Client::HandleRegister() {
 
 Client::ReturnStatus Client::HandleList() {
 	RequestList request(m_uuid);
+	BaseResponseHeader resHeader;
 
-	return Client::ReturnStatus::GeneralError;
+	uint8_t requestBuf[sizeof(request)] = { 0 };
+	uint8_t responseHeaderBuf[sizeof(resHeader)] = { 0 };
+
+	if (request.Serialize(requestBuf, sizeof(requestBuf)) == false) {
+		return Client::ReturnStatus::GeneralError;
+	}
+
+	try {
+		boost::asio::io_context io_context;
+		boost::asio::ip::tcp::socket socket(io_context);
+
+		boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(m_ipAddr), m_port);
+
+		socket.connect(endpoint);
+
+		socket.write_some(boost::asio::buffer(requestBuf, sizeof(requestBuf)));
+		socket.read_some(boost::asio::buffer(responseHeaderBuf, sizeof(responseHeaderBuf)));
+
+		// Deserialize only header to check opcode.
+		if (resHeader.Deserialize(responseHeaderBuf, sizeof(responseHeaderBuf)) == false) {
+			socket.close();	
+			return Client::ReturnStatus::GeneralError;
+		}
+
+		if (resHeader.code == (uint16_t)Opcode::ResponseFailure) {
+			socket.close();
+			return Client::ReturnStatus::ServerError;
+		}
+
+		// Payload size must align by node size.
+		if (resHeader.payloadSize % ResponseUsersListNode::GetSize() != 0) {
+			socket.close();
+			return Client::ReturnStatus::GeneralError;
+		}
+
+		auto numerOfNodes = resHeader.payloadSize / ResponseUsersListNode::GetSize();
+
+		for (auto i = 0; i < numerOfNodes; i++) {
+			ResponseUsersListNode currNode;
+			uint8_t currBuffer[ResponseUsersListNode::GetSize()] = { 0 };
+
+			socket.read_some(boost::asio::buffer(responseHeaderBuf, sizeof(responseHeaderBuf)));
+
+			memcpy(&currNode, currBuffer, ResponseUsersListNode::GetSize());
+			std::string currName((char*)currNode.name);
+
+			// No need handling this friend, since names are also unique.
+			if (FriendExists(currName) == true) {
+				continue;
+			}
+
+			// Adding the new friend to the list.
+			Friend* currFriend = new Friend();
+
+			// Keep getting the other clients.
+			if (currFriend->Init(currName, currNode.uuid, sizeof(currNode.uuid)) != true) {
+				delete currFriend;
+				continue;
+			}
+
+			m_friends.push_back(*currFriend);
+
+			std::cout << currName << std::endl;
+		}
+
+		socket.close();
+	}
+	catch (std::exception& e) {
+
+		std::cerr << "[ERROR] " << e.what() << std::endl;
+		return Client::ReturnStatus::GeneralError;
+	}
+
+	return Client::ReturnStatus::Success;
 }
 
 Client::ReturnStatus Client::HandlePublicKey() {
@@ -526,11 +608,7 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 	RequestGetMessages request(m_uuid);
 	uint8_t buffer[sizeof(request)];
 
-	request.Serialize(buffer, sizeof(buffer));
-
-	if (SendToServer(buffer, sizeof(buffer)) == false) {
-		return Client::ReturnStatus::GeneralError;
-	}
+//	request.Serialize(buffer, sizeof(buffer));
 
 	return Client::ReturnStatus::Success;
 }

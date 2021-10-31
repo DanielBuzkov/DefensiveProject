@@ -39,24 +39,13 @@ enum class Opcode : uint16_t {
 	only received and thus only the default c'tor shall be used.
 */
 
-template<Opcode _code, size_t _size>
-class RequestHeader {
+class BaseRequestHeader {
 public:
-	RequestHeader(UUID _uuid) : version(CLIENT_VERSION), code((uint16_t)_code), payloadSize((uint32_t)_size) {
-		if (_uuid.Serialize(clientId, sizeof(clientId)) == false) {
-			throw std::invalid_argument("Unable to handle currnt UUID for messages");
-		}
-	}
-	
-	RequestHeader() : clientId{ 0 }, version(CLIENT_VERSION), code((uint16_t)_code), payloadSize(_size) {}
-
-	uuid_t clientId;
-	uint8_t version;
-	uint16_t code;
-	uint32_t payloadSize;
+	BaseRequestHeader() : clientId{ 0 }, version(CLIENT_VERSION), code(0), payloadSize(0) {}
+	BaseRequestHeader(uint16_t _code, uint32_t _size) : clientId{ 0 }, version(CLIENT_VERSION), code(_code), payloadSize(_size) {}
 
 	const bool Serialize(uint8_t* o_buffer, size_t buffSize) const {
-		if (buffSize != sizeof(RequestHeader)) {
+		if (buffSize != sizeof(BaseRequestHeader)) {
 			return false;
 		}
 
@@ -67,16 +56,71 @@ public:
 
 		return true;
 	}
+
+protected:
+	uuid_t clientId;
+	uint8_t version;
+	uint16_t code;
+	uint32_t payloadSize;
 };
 
-template<Opcode _code, size_t _size>
-class ResponseHeader {
+class BaseResponseHeader {
 public:
-	ResponseHeader() : version(0), code(0), payloadSize(0) {}
+
+	BaseResponseHeader() : version(0), code(0), payloadSize(0) {}
 
 	uint8_t version;
 	uint16_t code;
 	uint32_t payloadSize;
+
+	bool Deserialize(uint8_t* o_buffer, size_t buffSize) {
+		if (buffSize != sizeof(BaseResponseHeader)) {
+			return false;
+		}
+
+		memcpy((uint8_t*)&version, o_buffer, sizeof(version));
+		memcpy((uint8_t*)&code, o_buffer + sizeof(version), sizeof(code));
+		memcpy((uint8_t*)&payloadSize, o_buffer + sizeof(version) + sizeof(code), sizeof(payloadSize));
+
+		// Failure header shall still be accepted
+		if (code == (uint16_t)Opcode::ResponseFailure) {
+			return true;
+		}
+
+		// Validating only opcode
+		if (code != (uint16_t)Opcode::ResponseRegister &&
+			code != (uint16_t)Opcode::ResponseList &&
+			code != (uint16_t)Opcode::ResponsePK &&
+			code != (uint16_t)Opcode::ResponseSendMessage &&
+			code != (uint16_t)Opcode::ResponseGetMessage &&
+			code != (uint16_t)Opcode::ResponseFailure) {
+
+			version = 0;
+			code = 0;
+			payloadSize = 0;
+
+			return false;
+		}
+
+		return true;
+	}
+};
+
+template<Opcode _code, size_t _size>
+class RequestHeader : public BaseRequestHeader {
+public:
+	RequestHeader(UUID _uuid) : BaseRequestHeader((uint16_t)_code, (uint32_t)_size) {
+		if (_uuid.Serialize(clientId, sizeof(clientId)) == false) {
+			throw std::invalid_argument("Unable to handle currnt UUID for messages");
+		}
+	}
+	
+	RequestHeader() : BaseRequestHeader((uint16_t)_code, (uint32_t)_size) {}
+};
+
+template<Opcode _code, size_t _size>
+class ResponseHeader : public BaseResponseHeader {
+public:
 
 	bool Deserialize(uint8_t* o_buffer, size_t buffSize) {
 		if (buffSize != sizeof(ResponseHeader)) {
