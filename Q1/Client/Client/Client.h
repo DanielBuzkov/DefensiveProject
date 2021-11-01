@@ -78,13 +78,17 @@ private:
 	bool ParseMeInfo();
 
 	template<Opcode _reqCode, typename ReqBody, Opcode _resCode, typename ResBody>
-	ReturnStatus Exchange(
-		const StaticRequest<_reqCode, ReqBody> request, 
-		StaticResponse<_resCode, ResBody>& response);
+	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response);
+
+	template<Opcode _reqCode, typename ReqBody>
+	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, uint8_t *response, const size_t resSize, BaseResponseHeader& o_header);
+
+	template<Opcode _resCode, typename ResBody>
+	ReturnStatus Exchange(const uint8_t *request, const size_t reqSize, StaticResponse<_resCode, ResBody>& response);
+
+	ReturnStatus Exchange(const uint8_t* request, const size_t reqSize, uint8_t *response, const size_t resSize, BaseResponseHeader& o_header);
 
 	bool UpdateMeInfo(uuid_t newUuid);
-
-	bool ChooseClientFromList(Friend* o_otherClient);
 
 	bool FriendExists(std::string name);
 
@@ -107,7 +111,7 @@ private:
 	uint16_t m_port;
 
 	// Save all clients to communicate with
-	std::list<Friend> m_friends;
+	std::list<Friend*> m_friends;
 
 	RSAPrivateWrapper *m_privateKey;
 	RSAPublicWrapper *m_publicKey;
@@ -118,47 +122,53 @@ private:
 };
 
 template<Opcode _reqCode, typename ReqBody, Opcode _resCode, typename ResBody>
-Client::ReturnStatus Client::Exchange(
-	const StaticRequest<_reqCode, ReqBody> request, 
-	StaticResponse<_resCode, ResBody>& response
-) {
+Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response) {
+	
 	uint8_t requestBuf[sizeof(request)] = { 0 };
-	uint8_t responseBuf[sizeof(response)] = { 0 };
 
 	if (request.Serialize(requestBuf, sizeof(requestBuf)) == false) {
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	try {
-		boost::asio::io_context io_context;
-		boost::asio::ip::tcp::socket socket(io_context);
+	return Exchange(requestBuf, sizeof(requestBuf), response);
 
-		boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(m_ipAddr), m_port);
+}
 
-		socket.connect(endpoint);
 
-		socket.write_some(boost::asio::buffer(requestBuf, sizeof(requestBuf)));
-		socket.read_some(boost::asio::buffer(responseBuf, sizeof(responseBuf)));
-		
-		socket.close();
+template<Opcode _reqCode, typename ReqBody>
+Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> request, uint8_t* response, const size_t resSize, BaseResponseHeader& o_header) {
+	
+	uint8_t requestBuf[sizeof(request)] = { 0 };
 
-		// Deserialize only header to check opcode
-		if (response.header.Deserialize(responseBuf, sizeof(response.header)) == false) {
-			return Client::ReturnStatus::GeneralError;
-		}
+	if (request.Serialize(requestBuf, sizeof(requestBuf)) == false) {
+		return Client::ReturnStatus::GeneralError;
+	}
 
-		if (response.header.code == (uint16_t)Opcode::ResponseFailure) {
-			return Client::ReturnStatus::ServerError;
-		}
+	return Exchange(requestBuf, sizeof(requestBuf), response, resSize, o_header);
+}
 
+template<Opcode _resCode, typename ResBody>
+Client::ReturnStatus Client::Exchange(const uint8_t* request, const size_t reqSize, StaticResponse<_resCode, ResBody>& response) {
+	
+	uint8_t responseBuf[sizeof(response)] = { 0 };
+	BaseResponseHeader header;
+
+	switch (Exchange(request, reqSize, responseBuf, sizeof(responseBuf), header)) {
+	case Client::ReturnStatus::ServerError:
+		return Client::ReturnStatus::ServerError;
+
+	case Client::ReturnStatus::GeneralError:
+		return Client::ReturnStatus::GeneralError;
+
+	case Client::ReturnStatus::Success:
 		// Message is not failure, try to get full message.
 		if (response.Desrialize(responseBuf, sizeof(responseBuf)) == false) {
 			return Client::ReturnStatus::GeneralError;
 		}
-	}
-	catch (std::exception& e) {
 
-		std::cerr << "[ERROR] " << e.what() << std::endl;
+		return Client::ReturnStatus::Success;
+
+	default:
 		return Client::ReturnStatus::GeneralError;
 	}
 

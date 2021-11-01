@@ -26,6 +26,10 @@ Client::~Client() {
 	if (m_publicKey != nullptr) {
 		delete m_publicKey;
 	}
+
+	for (Friend* currFriend : m_friends) {
+		delete currFriend;
+	}
 }
 
 bool Client::Init() {
@@ -351,31 +355,9 @@ bool Client::UpdateMeInfo(uuid_t newUuid) {
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DONE ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv NEEDS WORK vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
-
-bool Client::ChooseClientFromList(Friend* o_otherClient) {
-	if (m_friends.size() == 0) {
-		std::cout << "No friends found in list. Request client list from server." << std::endl;
-		return false;
-	}
-	
-	std::string name;
-
-	std::cout << "Enter friends name : ";
-	std::cin >> name;
-
-	for (Friend currFriend : m_friends) {
-		if (currFriend.IsNameEqual(name) == true) {
-			o_otherClient = &currFriend;
-			return true;
-		}
-	}
-
-	return false;
-}
-
 bool Client::FriendExists(std::string name) {
-	for (Friend currFriend : m_friends) {
-		if (currFriend.IsNameEqual(name) == true) {
+	for (Friend* currFriend : m_friends) {
+		if (currFriend->IsNameEqual(name) == true) {
 			return true;
 		}
 	}
@@ -457,145 +439,81 @@ Client::ReturnStatus Client::HandleList() {
 	RequestList request(m_uuid);
 	BaseResponseHeader resHeader;
 
-	uint8_t requestBuf[sizeof(request)] = { 0 };
-	uint8_t responseHeaderBuf[sizeof(resHeader)] = { 0 };
+	uint8_t responseBuf[6969] = { 0 };
 
-	if (request.Serialize(requestBuf, sizeof(requestBuf)) == false) {
+	// Sending request and waiting for response.
+	Client::ReturnStatus ret = Exchange(request, responseBuf, sizeof(responseBuf), resHeader);
+
+	if (ret != Client::ReturnStatus::Success) {
+		return ret;
+	}
+
+	if (resHeader.payloadSize % ResponseUsersListNode::GetSize() != 0) {
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	try {
-		boost::asio::io_context io_context;
-		boost::asio::ip::tcp::socket socket(io_context);
+	auto numerOfNodes = resHeader.payloadSize / ResponseUsersListNode::GetSize();
 
-		boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(m_ipAddr), m_port);
+	for (auto i = 0; i < numerOfNodes; i++) {
+		ResponseUsersListNode currNode;
 
-		socket.connect(endpoint);
+		memcpy(&currNode, responseBuf + sizeof(resHeader) + (i * ResponseUsersListNode::GetSize()), ResponseUsersListNode::GetSize());
+		std::string currName((char*)currNode.name);
 
-		socket.write_some(boost::asio::buffer(requestBuf, sizeof(requestBuf)));
-		socket.read_some(boost::asio::buffer(responseHeaderBuf, sizeof(responseHeaderBuf)));
+		std::cout << currName << std::endl;
 
-		// Deserialize only header to check opcode.
-		if (resHeader.Deserialize(responseHeaderBuf, sizeof(responseHeaderBuf)) == false) {
-			socket.close();	
-			return Client::ReturnStatus::GeneralError;
+		// No need handling this friend, since names are also unique.
+		if (FriendExists(currName) == true) {
+			continue;
 		}
 
-		if (resHeader.code == (uint16_t)Opcode::ResponseFailure) {
-			socket.close();
-			return Client::ReturnStatus::ServerError;
+		// Adding the new friend to the list.
+		Friend* currFriend = new Friend();
+
+		// Keep getting the other clients.
+		if (currFriend->Init(currName, currNode.uuid, sizeof(currNode.uuid)) != true) {
+			delete currFriend;
+			continue;
 		}
 
-		// Payload size must align by node size.
-		if (resHeader.payloadSize % ResponseUsersListNode::GetSize() != 0) {
-			socket.close();
-			return Client::ReturnStatus::GeneralError;
-		}
-
-		auto numerOfNodes = resHeader.payloadSize / ResponseUsersListNode::GetSize();
-
-		for (auto i = 0; i < numerOfNodes; i++) {
-			ResponseUsersListNode currNode;
-			uint8_t currBuffer[ResponseUsersListNode::GetSize()] = { 0 };
-
-			socket.read_some(boost::asio::buffer(responseHeaderBuf, sizeof(responseHeaderBuf)));
-
-			memcpy(&currNode, currBuffer, ResponseUsersListNode::GetSize());
-			std::string currName((char*)currNode.name);
-
-			// No need handling this friend, since names are also unique.
-			if (FriendExists(currName) == true) {
-				continue;
-			}
-
-			// Adding the new friend to the list.
-			Friend* currFriend = new Friend();
-
-			// Keep getting the other clients.
-			if (currFriend->Init(currName, currNode.uuid, sizeof(currNode.uuid)) != true) {
-				delete currFriend;
-				continue;
-			}
-
-			m_friends.push_back(*currFriend);
-
-			std::cout << currName << std::endl;
-		}
-
-		socket.close();
+		m_friends.push_back(currFriend);
 	}
-	catch (std::exception& e) {
-
-		std::cerr << "[ERROR] " << e.what() << std::endl;
-		return Client::ReturnStatus::GeneralError;
-	}
-
+	
 	return Client::ReturnStatus::Success;
 }
 
 Client::ReturnStatus Client::HandlePublicKey() {
-	Friend *otherClient = nullptr;
-	
-	// Determine which client's public key is wanted.
-	if (ChooseClientFromList(otherClient) == false) {
-		return Client::ReturnStatus::GeneralError;
-	}
+	//RequestPK request;
+	//ResponsePK response;
+	//
+	//if (otherClient->GetUuid(request.body.uuid) == false) {
+	//	return Client::ReturnStatus::GeneralError;
+	//}
+	//
+	//ReturnStatus ret = Exchange(request, response);
+	//
+	//if (ret == ReturnStatus::Success) {
+	//	otherClient->SetPublicKey(response.body.publicKey, sizeof(response.body.publicKey));
+	//}
+	//
+	//return ret;
 
-	RequestPK request;
-	ResponsePK response;
-	
-	if (otherClient->GetUuid(request.body.uuid) == false) {
-		return Client::ReturnStatus::GeneralError;
-	}
-
-	ReturnStatus ret = Exchange(request, response);
-
-	if (ret == ReturnStatus::Success) {
-		otherClient->SetPublicKey(response.body.publicKey, sizeof(response.body.publicKey));
-	}
-
-	return ret;
+	return Client::ReturnStatus::Success;
 }
 
 Client::ReturnStatus Client::HandleRequestSymKey() {
-	Friend* otherClient = nullptr;
-
-	// Determine from which client request a sym key.
-	if (ChooseClientFromList(otherClient) == false) {
-		return Client::ReturnStatus::GeneralError;
-	}
 
 	RequestGetSymKey request(m_uuid);
 	ResponseSendMessage response;
-
-	if (otherClient->GetUuid(request.body.uuid) == false) {
-		return Client::ReturnStatus::GeneralError;
-	}
 
 	return Exchange(request, response);
 }
 
 Client::ReturnStatus Client::HandleSendSymKey() {
-	Friend* otherClient = nullptr;
 
-	// Determine to which client send a sym key.
-	if (ChooseClientFromList(otherClient) == false) {
-		return Client::ReturnStatus::GeneralError;
-	}
-
-	if (otherClient->HasSym() == false) {
-		std::cout << "No symmetric key for this user" << std::endl;
-		return Client::ReturnStatus::GeneralError;
-	}
 
 	RequestSendSymKey request(m_uuid);
 	ResponseSendMessage response;
-
-	if (otherClient->GetUuid(request.body.uuid) == false) {
-		return Client::ReturnStatus::GeneralError;
-	}
-
-	memcpy(request.body.content.symKey, otherClient->GetSymKey()->getKey(), sizeof(request.body.content.symKey));
 
 	return Exchange(request, response);
 }
@@ -609,6 +527,60 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 	uint8_t buffer[sizeof(request)];
 
 //	request.Serialize(buffer, sizeof(buffer));
+
+	return Client::ReturnStatus::Success;
+}
+
+Client::ReturnStatus Client::Exchange(const uint8_t* request, const size_t reqSize, uint8_t* o_response, const size_t resSize, BaseResponseHeader& o_header) {
+
+	size_t read = 0;
+
+	try {
+		boost::asio::io_context io_context;
+		boost::asio::ip::tcp::socket socket(io_context);
+
+		boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(m_ipAddr), m_port);
+
+		socket.connect(endpoint);
+
+		boost::asio::write(socket, boost::asio::buffer(request, reqSize));
+		read = boost::asio::read(socket, boost::asio::buffer(o_response, resSize), boost::asio::transfer_at_least(sizeof(o_header)));
+
+		//socket.write_some(boost::asio::buffer(request, reqSize));
+		//socket.read_some(boost::asio::buffer(response, resSize), boost::asio::transfer_at_least(sizeof(header));
+
+		socket.close();
+	}
+	catch (std::exception& e) {
+
+		std::cerr << "[ERROR] " << e.what() << std::endl;
+		return Client::ReturnStatus::GeneralError;
+	}
+
+	// Deserialize only header to check opcode.
+	if (o_header.Deserialize(o_response, sizeof(o_header)) == false) {
+		return Client::ReturnStatus::GeneralError;
+	}
+
+	// Make sure the server hasn't responded with an error.
+	if (o_header.code == (uint16_t)Opcode::ResponseFailure) {
+		return Client::ReturnStatus::ServerError;
+	}
+
+	// Validating as much as possible.
+	if (read != o_header.payloadSize + sizeof(o_header)) {
+		return Client::ReturnStatus::GeneralError;
+	}
+
+	// Check if received response.
+	if (o_header.code != (uint16_t)Opcode::ResponseRegister &&
+		o_header.code != (uint16_t)Opcode::ResponseList &&
+		o_header.code != (uint16_t)Opcode::ResponsePK &&
+		o_header.code != (uint16_t)Opcode::ResponseSendMessage &&
+		o_header.code != (uint16_t)Opcode::ResponseGetMessage &&
+		o_header.code != (uint16_t)Opcode::ResponseFailure) {
+		return Client::ReturnStatus::GeneralError;
+	}
 
 	return Client::ReturnStatus::Success;
 }
