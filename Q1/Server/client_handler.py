@@ -1,6 +1,7 @@
 from threading import Thread, Lock
 from utils.protocol import *
 import uuid
+import socket
 
 
 class ClientData:
@@ -64,6 +65,8 @@ class ClientHandler:
         for message in self.users[uuid].recv_messages:
             send_buffer += message.raw
 
+        self.users[uuid].recv_messages.clear()
+
         return send_buffer
 
     def is_sender_valid(self, header : RequestHeader):
@@ -72,7 +75,7 @@ class ClientHandler:
 
         return True
 
-    def send_error(self, client_sock):
+    def send_error(self, client_sock : socket):
         response = ResponseHeader()
         client_sock.send(response.raw)
 
@@ -137,7 +140,7 @@ class ClientHandler:
     def handle_get_messages(self, uuid):
         return self.get_messages_from_uuid(UUID(bytes=uuid))
 
-    def handle_client(self, client_socket):
+    def handle_client(self, client_socket : socket):
         # Validate header:
         data = client_socket.recv(REQ_HEADER_LEN)
 

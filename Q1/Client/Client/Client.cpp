@@ -134,7 +134,16 @@ Client::MenuOptions Client::GetMenuChoise() {
 
 	while(true) {
 		PrintOption();
-		std::cin >> userInput;
+		std::cin >> userInput; //*!
+
+		// Handling failed input and clearing the error flag and buffer.
+		if (std::cin.fail()) {
+			std::cin.clear();
+			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+			std::cout << "Bad entry, please enter a number from the list." << std::endl;
+			continue;
+		}
 
 		// Making sure the choise is in the whitelist.
 		if (userInput != (uint16_t)Client::MenuOptions::Register &&

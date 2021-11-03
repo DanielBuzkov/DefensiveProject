@@ -9,7 +9,10 @@ from client_handler import ClientHandler
 PORT_FILE_PATH = "port.info"
 MAX_PORT_VALUE = 65535
 
-
+'''
+	The function will raise an exception upon failure which will not be
+	caught by the caller since the server needs the port number to continue.
+'''
 def get_port():
 	# if the file doesn't exist.
 	if not os.path.isfile(PORT_FILE_PATH):
