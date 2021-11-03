@@ -18,7 +18,7 @@ static constexpr size_t MIN_IP_STR_LENGTH = (4 * 1) + 3;
 static constexpr size_t MAX_PORT_STR_LENGTH = 5;
 static constexpr size_t MIN_PORT_STR_LENGTH = 1;
 
-static constexpr size_t MAX_MESSAGE_LENGTH = 50000;
+static constexpr size_t MAX_MESSAGE_LENGTH = 8192;
 
 Client::~Client() {
 	if (m_privateKey != nullptr) {

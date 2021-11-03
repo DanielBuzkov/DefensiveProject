@@ -1,9 +1,9 @@
 #Server version 2
 
-from utils import sql_utils
 import socket
 import os
 
+from utils.sql_handler import SqlHandler
 from client_handler import ClientHandler
 
 PORT_FILE_PATH = "port.info"
@@ -38,6 +38,7 @@ def run_server(port_number: int):
 	sock.listen(50)
 
 	handler = ClientHandler()
+	# sql_handler = MutexableSql()
 
 	while True:
 		client_socket, addr = sock.accept()

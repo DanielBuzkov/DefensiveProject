@@ -1,4 +1,4 @@
-from threading import Thread
+from threading import Thread, Lock
 from utils.protocol import *
 import uuid
 
@@ -12,13 +12,27 @@ class ClientData:
 
 class ClientHandler:
     def __init__(self):
+        self.mutex = Lock()
         self.users = {}
+
+    def locker(func):
+        def inner(self, *args, **kwargs):
+            self.mutex.acquire()
+            try:
+                ret = func(self, *args, **kwargs)
+                return ret
+            finally:
+                self.mutex.release()
+
+        return inner
 
     #------------------------------------------- UTILS -------------------------------------------
 
-    def is_registered(self, client_id):
+    @locker
+    def is_registered(self, client_id : UUID):
         return client_id in self.users
 
+    @locker
     def username_exists(self, name):
         for user in self.users:
             if self.users[user].name == name:
@@ -26,14 +40,39 @@ class ClientHandler:
 
         return False
 
-    def is_sender_valid(self, header):
+    @locker
+    def add_user(self, client : ClientData, uuid : UUID):
+        if uuid not in self.users:
+            self.users[uuid] = client
+
+    @locker
+    def get_pk_from_uuid(self, uuid : UUID):
+        return self.users[uuid].public_key
+
+    @locker
+    def push_message(self, uuid : UUID, message : SendMessageReqBody):
+        self.users[uuid].recv_messages.append(message)
+
+    @locker
+    def get_name_from_uuid(self, uuid : UUID):
+        return self.users[uuid].name
+
+    @locker
+    def get_messages_from_uuid(self, uuid : UUID):
+        send_buffer = bytes()
+
+        for message in self.users[uuid].recv_messages:
+            send_buffer += message.raw
+
+        return send_buffer
+
+    def is_sender_valid(self, header : RequestHeader):
         if header.code != Opcodes.RegisterReq and self.is_registered(UUID(bytes=header.client_id)) is False:
             return False
 
         return True
 
     def send_error(self, client_sock):
-        print("SENDING ERROR!")
         response = ResponseHeader()
         client_sock.send(response.raw)
 
@@ -50,7 +89,7 @@ class ClientHandler:
         while self.is_registered(new_id):
             new_id = uuid.uuid1()
 
-        self.users[new_id] = ClientData(body.name, body.pk)
+        self.add_user(ClientData(body.name, body.pk), new_id)
         response = RegisterResBody(new_id)
 
         return response.raw
@@ -60,13 +99,13 @@ class ClientHandler:
         send_buffer = bytes()
 
         for uuid in self.users:
-            send_buffer += UserListResNode(uuid, self.users[uuid].name).raw
+            send_buffer += UserListResNode(uuid, self.get_name_from_uuid(uuid)).raw
 
         return send_buffer
 
     def handle_get_public_key(self, payload):
         body = GetPKReqBody(payload)
-        response = GetPKResBody(body.client_id, self.users[UUID(bytes=body.client_id)].public_key)
+        response = GetPKResBody(body.client_id, self.get_pk_from_uuid(UUID(bytes=body.client_id)))
 
         return response.raw
 
@@ -91,18 +130,12 @@ class ClientHandler:
             body.content_size != SYM_KEY_LENGTH):
             return None
 
-        self.users[UUID(bytes=body.client_id)].recv_messages.append(body)
+        self.push_message(UUID(bytes=body.client_id), body)
 
         return response.raw
 
     def handle_get_messages(self, uuid):
-        # This handler doesn't need body data, thus no parsing is needed.
-        send_buffer = bytes()
-
-        for message in self.users[UUID(bytes=uuid)].recv_messages:
-            send_buffer += message.raw
-
-        return send_buffer
+        return self.get_messages_from_uuid(UUID(bytes=uuid))
 
     def handle_client(self, client_socket):
         # Validate header:
