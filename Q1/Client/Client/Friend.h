@@ -23,7 +23,7 @@ public:
 	RSAPublicWrapper* GetPublicKey();
 	AESWrapper* GetSymKey();
 	
-	void SetPublicKey(const uint8_t* key, size_t keyLen);
+	void SetPublicKey(const publicKey_t key);
 	void SetSymKey(const uint8_t* key, size_t keyLen);
 
 private:

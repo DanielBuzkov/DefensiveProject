@@ -13,7 +13,7 @@
 
 class Client {
 public:
-	Client() : m_isInit(false), m_port(0), m_privateKey(nullptr), m_publicKey(nullptr) {}
+	Client() : m_isInit(false), m_port(0), m_privateKey(nullptr) {}
 	~Client();
 
 	/**
@@ -77,6 +77,8 @@ private:
 
 	bool ParseMeInfo();
 
+	bool GetFriendFromName(std::string name, Friend* o_friend);
+
 	template<Opcode _reqCode, typename ReqBody, Opcode _resCode, typename ResBody>
 	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response);
 
@@ -96,11 +98,11 @@ private:
 	ReturnStatus HandleList();
 	ReturnStatus HandlePublicKey();
 
-	ReturnStatus HandleRequestSymKey();
-	ReturnStatus HandleSendSymKey();
+	ReturnStatus HandleWaitingMessages();
 	ReturnStatus HandleSendMessage();
 
-	ReturnStatus HandleWaitingMessages();
+	ReturnStatus HandleRequestSymKey();
+	ReturnStatus HandleSendSymKey();
 
 private:
 	// To keep track if the client has been refistered or not.
@@ -114,7 +116,6 @@ private:
 	std::list<Friend*> m_friends;
 
 	RSAPrivateWrapper *m_privateKey;
-	RSAPublicWrapper *m_publicKey;
 
 	// Client's name, UUID and given public key
 	Name m_name;
@@ -133,7 +134,6 @@ Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> req
 	return Exchange(requestBuf, sizeof(requestBuf), response);
 
 }
-
 
 template<Opcode _reqCode, typename ReqBody>
 Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> request, uint8_t* response, const size_t resSize, BaseResponseHeader& o_header) {
@@ -174,4 +174,3 @@ Client::ReturnStatus Client::Exchange(const uint8_t* request, const size_t reqSi
 
 	return Client::ReturnStatus::Success;
 }
-

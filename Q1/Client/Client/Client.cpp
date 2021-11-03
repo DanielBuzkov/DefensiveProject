@@ -18,13 +18,11 @@ static constexpr size_t MIN_IP_STR_LENGTH = (4 * 1) + 3;
 static constexpr size_t MAX_PORT_STR_LENGTH = 5;
 static constexpr size_t MIN_PORT_STR_LENGTH = 1;
 
+static constexpr size_t MAX_MESSAGE_LENGTH = 50000;
+
 Client::~Client() {
 	if (m_privateKey != nullptr) {
 		delete m_privateKey;
-	}
-
-	if (m_publicKey != nullptr) {
-		delete m_publicKey;
 	}
 
 	for (Friend* currFriend : m_friends) {
@@ -107,6 +105,9 @@ void Client::Run(){
 
 		if (ret == Client::ReturnStatus::ServerError) {
 			std::cout << "Server responded with an error" << std::endl;
+		}
+		else if (ret == Client::ReturnStatus::GeneralError) {
+			std::cout << "Error while handling request" << std::endl;
 		}
 	}
 }
@@ -352,12 +353,20 @@ bool Client::UpdateMeInfo(uuid_t newUuid) {
 	return true;
 }
 
-// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DONE ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-// vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv NEEDS WORK vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-
 bool Client::FriendExists(std::string name) {
 	for (Friend* currFriend : m_friends) {
 		if (currFriend->IsNameEqual(name) == true) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool Client::GetFriendFromName(std::string name, Friend* o_friend) {
+	for (Friend* currFriend : m_friends) {
+		if (currFriend->IsNameEqual(name) == true) {
+			o_friend = currFriend;
 			return true;
 		}
 	}
@@ -396,10 +405,8 @@ Client::ReturnStatus Client::HandleRegister() {
 
 	// Generating the key pair for RSA
 	m_privateKey = new RSAPrivateWrapper();
-	m_publicKey = new RSAPublicWrapper(m_privateKey->getPublicKey());
+	m_privateKey->getPublicKey((char*)request.body.publicKey, sizeof(request.body.publicKey));
 
-	m_publicKey->getPublicKey((char*)request.body.publicKey, sizeof(request.body.publicKey));
-	
 	// Sending request and waiting for response.
 	ReturnStatus ret = Exchange(request, response);
 
@@ -407,10 +414,7 @@ Client::ReturnStatus Client::HandleRegister() {
 		// Update me.info with all new values.
 		if (UpdateMeInfo(response.body.uuid) == false) {
 			// Making sure no traces left after failure.
-			delete m_publicKey;
 			delete m_privateKey;
-
-			m_publicKey = nullptr;
 			m_privateKey = nullptr;
 
 			m_name.Reset();
@@ -423,10 +427,7 @@ Client::ReturnStatus Client::HandleRegister() {
 	}
 	else {
 		// Making sure no traces left after failure.
-		delete m_publicKey;
 		delete m_privateKey;
-
-		m_publicKey = nullptr;
 		m_privateKey = nullptr;
 
 		m_name.Reset();
@@ -439,7 +440,7 @@ Client::ReturnStatus Client::HandleList() {
 	RequestList request(m_uuid);
 	BaseResponseHeader resHeader;
 
-	uint8_t responseBuf[6969] = { 0 };
+	uint8_t responseBuf[MAX_MESSAGE_LENGTH] = { 0 };
 
 	// Sending request and waiting for response.
 	Client::ReturnStatus ret = Exchange(request, responseBuf, sizeof(responseBuf), resHeader);
@@ -483,42 +484,32 @@ Client::ReturnStatus Client::HandleList() {
 }
 
 Client::ReturnStatus Client::HandlePublicKey() {
-	//RequestPK request;
-	//ResponsePK response;
-	//
-	//if (otherClient->GetUuid(request.body.uuid) == false) {
-	//	return Client::ReturnStatus::GeneralError;
-	//}
-	//
-	//ReturnStatus ret = Exchange(request, response);
-	//
-	//if (ret == ReturnStatus::Success) {
-	//	otherClient->SetPublicKey(response.body.publicKey, sizeof(response.body.publicKey));
-	//}
-	//
-	//return ret;
+	RequestPK request(m_uuid);
+	ResponsePK response;
+	
+	std::string name;
 
-	return Client::ReturnStatus::Success;
-}
+	std::cout << "Insert destenation name: ";
+	std::cin >> name;
 
-Client::ReturnStatus Client::HandleRequestSymKey() {
+	for (Friend* currFriend : m_friends) {
+		if (currFriend->IsNameEqual(name) == true) {
+			if (currFriend->GetUuid(request.body.uuid) == false) {
 
-	RequestGetSymKey request(m_uuid);
-	ResponseSendMessage response;
+				std::cout << "Failed getting UUID for user" << std::endl;
+				return Client::ReturnStatus::GeneralError;
+			}
 
-	return Exchange(request, response);
-}
+			ReturnStatus ret = Exchange(request, response);
 
-Client::ReturnStatus Client::HandleSendSymKey() {
+			if (ret == ReturnStatus::Success) {
+				currFriend->SetPublicKey(response.body.publicKey);
+			}
 
+			return ret;
+		}
+	}
 
-	RequestSendSymKey request(m_uuid);
-	ResponseSendMessage response;
-
-	return Exchange(request, response);
-}
-
-Client::ReturnStatus Client::HandleSendMessage() {
 	return Client::ReturnStatus::GeneralError;
 }
 
@@ -526,10 +517,70 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 	RequestGetMessages request(m_uuid);
 	uint8_t buffer[sizeof(request)];
 
-//	request.Serialize(buffer, sizeof(buffer));
+	//	request.Serialize(buffer, sizeof(buffer));
 
 	return Client::ReturnStatus::Success;
 }
+
+Client::ReturnStatus Client::HandleSendMessage() {
+	return Client::ReturnStatus::GeneralError;
+}
+
+Client::ReturnStatus Client::HandleRequestSymKey() {
+
+	RequestGetSymKey request(m_uuid);
+	ResponseSendMessage response;
+
+	std::string name;
+
+	std::cout << "Insert destenation name: ";
+	std::cin >> name;
+
+	for (Friend* currFriend : m_friends) {
+		if (currFriend->IsNameEqual(name) == true) {
+			if (currFriend->GetUuid(request.body.uuid) == false) {
+
+				std::cout << "Failed getting UUID for user" << std::endl;
+				return Client::ReturnStatus::GeneralError;
+			}
+
+			return Exchange(request, response);
+		}
+	}
+
+	return Client::ReturnStatus::GeneralError;
+}
+
+Client::ReturnStatus Client::HandleSendSymKey() {
+
+	RequestSendSymKey request(m_uuid);
+	ResponseSendMessage response;
+
+	std::string name;
+
+	std::cout << "Insert destenation name: ";
+	std::cin >> name;
+
+	for (Friend* currFriend : m_friends) {
+		if (currFriend->IsNameEqual(name) == true) {
+			if (currFriend->GetUuid(request.body.uuid) == false) {
+
+				std::cout << "Failed getting UUID for user" << std::endl;
+				return Client::ReturnStatus::GeneralError;
+			}
+
+			uint8_t encryptedBuffer[sizeof(RequestSendSymKey)] = { 0 };
+
+			//currFriend->GetPublicKey()->encrypt(request.)
+
+			return Exchange(request, response);
+		}
+	}
+
+	return Client::ReturnStatus::GeneralError;
+}
+
+
 
 Client::ReturnStatus Client::Exchange(const uint8_t* request, const size_t reqSize, uint8_t* o_response, const size_t resSize, BaseResponseHeader& o_header) {
 
@@ -569,16 +620,6 @@ Client::ReturnStatus Client::Exchange(const uint8_t* request, const size_t reqSi
 
 	// Validating as much as possible.
 	if (read != o_header.payloadSize + sizeof(o_header)) {
-		return Client::ReturnStatus::GeneralError;
-	}
-
-	// Check if received response.
-	if (o_header.code != (uint16_t)Opcode::ResponseRegister &&
-		o_header.code != (uint16_t)Opcode::ResponseList &&
-		o_header.code != (uint16_t)Opcode::ResponsePK &&
-		o_header.code != (uint16_t)Opcode::ResponseSendMessage &&
-		o_header.code != (uint16_t)Opcode::ResponseGetMessage &&
-		o_header.code != (uint16_t)Opcode::ResponseFailure) {
 		return Client::ReturnStatus::GeneralError;
 	}
 
