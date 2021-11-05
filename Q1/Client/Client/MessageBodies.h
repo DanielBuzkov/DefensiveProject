@@ -37,6 +37,12 @@ typedef struct _RequestPKBody {
 } RequestPKBody;
 
 // Opcode 1003
+class MessageHeader {
+	uuid_t uuid;
+	uint8_t messageType;
+	uint32_t contentSize;
+};
+
 template <MessageType _type, typename Content>
 struct MessageToClient {
 	MessageToClient() : messageType((uint8_t)_type), contentSize(Content::GetSize()) {}

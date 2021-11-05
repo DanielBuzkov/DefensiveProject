@@ -83,12 +83,12 @@ private:
 	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response);
 
 	template<Opcode _reqCode, typename ReqBody>
-	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, uint8_t *response, const size_t resSize, BaseResponseHeader& o_header);
+	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, std::vector<uint8_t>& responseVec);
 
 	template<Opcode _resCode, typename ResBody>
-	ReturnStatus Exchange(const uint8_t *request, const size_t reqSize, StaticResponse<_resCode, ResBody>& response);
+	ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, StaticResponse<_resCode, ResBody>& response);
 
-	ReturnStatus Exchange(const uint8_t* request, const size_t reqSize, uint8_t *response, const size_t resSize, BaseResponseHeader& o_header);
+	ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec);
 
 	bool UpdateMeInfo(uuid_t newUuid);
 
@@ -123,37 +123,27 @@ private:
 };
 
 template<Opcode _reqCode, typename ReqBody, Opcode _resCode, typename ResBody>
-Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response) {
-	
-	uint8_t requestBuf[sizeof(request)] = { 0 };
+Client::ReturnStatus Client ::Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response) {
+	std::vector<uint8_t> requestVec;
+	request.Serialize(requestVec);
 
-	if (request.Serialize(requestBuf, sizeof(requestBuf)) == false) {
-		return Client::ReturnStatus::GeneralError;
-	}
-
-	return Exchange(requestBuf, sizeof(requestBuf), response);
-
+	return Exchange(requestVec, response);
 }
 
 template<Opcode _reqCode, typename ReqBody>
-Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> request, uint8_t* response, const size_t resSize, BaseResponseHeader& o_header) {
-	
-	uint8_t requestBuf[sizeof(request)] = { 0 };
+Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> request, std::vector<uint8_t>& responseVec) {
+	std::vector<uint8_t> requestVec;
+	request.Serialize(requestVec);
 
-	if (request.Serialize(requestBuf, sizeof(requestBuf)) == false) {
-		return Client::ReturnStatus::GeneralError;
-	}
-
-	return Exchange(requestBuf, sizeof(requestBuf), response, resSize, o_header);
+	return Exchange(requestVec, responseVec);
 }
 
 template<Opcode _resCode, typename ResBody>
-Client::ReturnStatus Client::Exchange(const uint8_t* request, const size_t reqSize, StaticResponse<_resCode, ResBody>& response) {
-	
-	uint8_t responseBuf[sizeof(response)] = { 0 };
-	BaseResponseHeader header;
+Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, StaticResponse<_resCode, ResBody>& response) {
 
-	switch (Exchange(request, reqSize, responseBuf, sizeof(responseBuf), header)) {
+	std::vector<uint8_t> responseVec;
+
+	switch (Exchange(requestVec, responseVec)) {
 	case Client::ReturnStatus::ServerError:
 		return Client::ReturnStatus::ServerError;
 
@@ -162,7 +152,8 @@ Client::ReturnStatus Client::Exchange(const uint8_t* request, const size_t reqSi
 
 	case Client::ReturnStatus::Success:
 		// Message is not failure, try to get full message.
-		if (response.Desrialize(responseBuf, sizeof(responseBuf)) == false) {
+		if (response.Desrialize(responseVec) == false) {
+			std::cout << "Failed deserialize" << std::endl;
 			return Client::ReturnStatus::GeneralError;
 		}
 

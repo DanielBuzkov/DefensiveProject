@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdexcept>
+#include <vector>
 
 #include "Defines.h"
 #include "Validators.h"
@@ -39,25 +40,25 @@ enum class Opcode : uint16_t {
 	only received and thus only the default c'tor shall be used.
 */
 
-class BaseRequestHeader {
+template<Opcode _code, size_t _size>
+class RequestHeader {
 public:
-	BaseRequestHeader() : clientId{ 0 }, version(CLIENT_VERSION), code(0), payloadSize(0) {}
-	BaseRequestHeader(uint16_t _code, uint32_t _size) : clientId{ 0 }, version(CLIENT_VERSION), code(_code), payloadSize(_size) {}
+	RequestHeader() : clientId{ 0 }, version(CLIENT_VERSION), code((uint16_t)_code), payloadSize((uint32_t)_size) {}
+	RequestHeader(UUID _uuid) : version(CLIENT_VERSION), code((uint16_t)_code), payloadSize((uint32_t)_size) {
 
-	const bool Serialize(uint8_t* o_buffer, size_t buffSize) const {
-		if (buffSize != sizeof(BaseRequestHeader)) {
-			return false;
+		if (_uuid.Serialize(clientId, sizeof(clientId)) == false) {
+			throw std::invalid_argument("Unable to handle currnt UUID for messages");
 		}
-
-		memcpy(o_buffer, clientId, sizeof(clientId));
-		memcpy(o_buffer + sizeof(clientId), &version, sizeof(version));
-		memcpy(o_buffer + sizeof(clientId) + sizeof(version), &code, sizeof(code));
-		memcpy(o_buffer + sizeof(clientId) + sizeof(version) + sizeof(code), &payloadSize, sizeof(payloadSize));
-
-		return true;
 	}
 
-protected:
+	const void Serialize(std::vector<uint8_t>& o_vector) const {
+		o_vector.clear();
+		o_vector.resize(sizeof(RequestHeader));
+
+		memcpy(&o_vector[0], this, sizeof(RequestHeader));
+	}
+
+private:
 	uuid_t clientId;
 	uint8_t version;
 	uint16_t code;
@@ -69,22 +70,17 @@ public:
 
 	BaseResponseHeader() : version(0), code(0), payloadSize(0) {}
 
-	uint8_t version;
-	uint16_t code;
-	uint32_t payloadSize;
+	Opcode GetCode() { return (Opcode)code; }
+	uint32_t GetPayloadSize() { return payloadSize; }
 
-	bool Deserialize(uint8_t* o_buffer, size_t buffSize) {
-		if (buffSize != sizeof(BaseResponseHeader)) {
-			return false;
-		}
-
-		memcpy((uint8_t*)&version, o_buffer, sizeof(version));
-		memcpy((uint8_t*)&code, o_buffer + sizeof(version), sizeof(code));
-		memcpy((uint8_t*)&payloadSize, o_buffer + sizeof(version) + sizeof(code), sizeof(payloadSize));
+	bool Deserialize(const std::vector<uint8_t>& inVector) {
+		memcpy((uint8_t*)&version, inVector.data(), sizeof(version));
+		memcpy((uint8_t*)&code, inVector.data() + sizeof(version), sizeof(code));
+		memcpy((uint8_t*)&payloadSize, inVector.data() + sizeof(version) + sizeof(code), sizeof(payloadSize));
 
 		// Failure header shall still be accepted
 		if (code == (uint16_t)Opcode::ResponseFailure) {
-			return true;
+			return payloadSize == 0;
 		}
 
 		// Validating only opcode
@@ -104,32 +100,27 @@ public:
 
 		return true;
 	}
-};
 
-template<Opcode _code, size_t _size>
-class RequestHeader : public BaseRequestHeader {
-public:
-	RequestHeader(UUID _uuid) : BaseRequestHeader((uint16_t)_code, (uint32_t)_size) {
-		if (_uuid.Serialize(clientId, sizeof(clientId)) == false) {
-			throw std::invalid_argument("Unable to handle currnt UUID for messages");
-		}
-	}
-	
-	RequestHeader() : BaseRequestHeader((uint16_t)_code, (uint32_t)_size) {}
+protected:
+	uint8_t version;
+	uint16_t code;
+	uint32_t payloadSize;
 };
-
+#include <iostream>
 template<Opcode _code, size_t _size>
 class ResponseHeader : public BaseResponseHeader {
 public:
 
-	bool Deserialize(uint8_t* o_buffer, size_t buffSize) {
-		if (buffSize != sizeof(ResponseHeader)) {
+	bool Deserialize(const std::vector<uint8_t>& inVector) {
+
+		if (inVector.size() < sizeof(version) + sizeof(code) + sizeof(payloadSize)) {
+			std::cout << "Invalid size" << std::endl;
 			return false;
 		}
 
-		memcpy((uint8_t*)&version, o_buffer, sizeof(version));
-		memcpy((uint8_t*)&code, o_buffer + sizeof(version), sizeof(code));
-		memcpy((uint8_t*)&payloadSize, o_buffer + sizeof(version) + sizeof(code), sizeof(payloadSize));
+		memcpy((uint8_t*)&version, inVector.data(), sizeof(version));
+		memcpy((uint8_t*)&code, inVector.data() + sizeof(version), sizeof(code));
+		memcpy((uint8_t*)&payloadSize, inVector.data() + sizeof(version) + sizeof(code), sizeof(payloadSize));
 
 		// Failure header shall still be accepted
 		if (code == (uint16_t)Opcode::ResponseFailure) {
@@ -164,18 +155,16 @@ public:
 	RequestHeader<_code, Body::GetSize()> header;
 	Body body;
 
-	const bool Serialize(uint8_t* o_buffer, size_t buffSize) const {
-		if (buffSize != sizeof(header) + sizeof(Body)) {
-			return false;
+	const void Serialize(std::vector<uint8_t>& o_vector) const {
+		o_vector.resize(sizeof(header));
+		header.Serialize(o_vector);
+
+		if (Body::GetSize() > 0) {
+			std::vector<uint8_t> payload(Body::GetSize());
+			memcpy(&payload[0], &body, Body::GetSize());
+
+			o_vector.insert(o_vector.end(), payload.begin(), payload.end());
 		}
-
-		if (header.Serialize(o_buffer, sizeof(header)) == false) {
-			return false;
-		}
-
-		memcpy(o_buffer + sizeof(header), &body, sizeof(body));
-
-		return true;
 	}
 
 };
@@ -186,16 +175,22 @@ public:
 	ResponseHeader<_code, Body::GetSize()> header;
 	Body body;
 
-	bool Desrialize(uint8_t* o_buffer, size_t buffSize) {
-		if (buffSize != sizeof(header) + Body::GetSize()) {
+	bool Desrialize(const std::vector<uint8_t>& inVector) {
+
+		if (header.Deserialize(inVector) != true) {
 			return false;
 		}
 
-		if (header.Deserialize(o_buffer, sizeof(header)) == false) {
+		if (header.GetCode() == Opcode::ResponseFailure) {
+			return inVector.size() == sizeof(header);
+		}
+
+		if (inVector.size() != sizeof(header) + Body::GetSize()) {
 			return false;
 		}
 
-		memcpy(&body, o_buffer + sizeof(header), Body::GetSize());
+		std::vector<uint8_t> payload(inVector.begin() + sizeof(header), inVector.end());
+		memcpy((uint8_t*)&body, payload.data(), sizeof(body));
 
 		return true;
 	}

@@ -384,7 +384,6 @@ bool Client::GetFriendFromName(std::string name, Friend* o_friend) {
 }
 
 //--------------------------------------------- HANDLERS ---------------------------------------------
-
 Client::ReturnStatus Client::HandleRegister() {
 	
 	// Making sure a registered user is not registering again.
@@ -447,27 +446,27 @@ Client::ReturnStatus Client::HandleRegister() {
 
 Client::ReturnStatus Client::HandleList() {
 	RequestList request(m_uuid);
-	BaseResponseHeader resHeader;
-
-	uint8_t responseBuf[MAX_MESSAGE_LENGTH] = { 0 };
+	std::vector<uint8_t> responseVec;
 
 	// Sending request and waiting for response.
-	Client::ReturnStatus ret = Exchange(request, responseBuf, sizeof(responseBuf), resHeader);
-
+	Client::ReturnStatus ret = Exchange(request, responseVec);
 	if (ret != Client::ReturnStatus::Success) {
 		return ret;
 	}
 
-	if (resHeader.payloadSize % ResponseUsersListNode::GetSize() != 0) {
+	// The exchange function has aleady validated the data is deserializeable and the lengths match.
+	auto payloadSize = responseVec.size() - sizeof(BaseResponseHeader);
+
+	if (payloadSize % ResponseUsersListNode::GetSize() != 0) {
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	auto numerOfNodes = resHeader.payloadSize / ResponseUsersListNode::GetSize();
+	auto numerOfNodes = payloadSize / ResponseUsersListNode::GetSize();
 
 	for (auto i = 0; i < numerOfNodes; i++) {
 		ResponseUsersListNode currNode;
 
-		memcpy(&currNode, responseBuf + sizeof(resHeader) + (i * ResponseUsersListNode::GetSize()), ResponseUsersListNode::GetSize());
+		memcpy(&currNode, responseVec.data() + sizeof(BaseResponseHeader) + (i * ResponseUsersListNode::GetSize()), ResponseUsersListNode::GetSize());
 		std::string currName((char*)currNode.name);
 
 		std::cout << currName << std::endl;
@@ -519,14 +518,45 @@ Client::ReturnStatus Client::HandlePublicKey() {
 		}
 	}
 
+	std::cout << "Friend not found" << std::endl;
+
 	return Client::ReturnStatus::GeneralError;
 }
 
 Client::ReturnStatus Client::HandleWaitingMessages() {
-	RequestGetMessages request(m_uuid);
-	uint8_t buffer[sizeof(request)];
 
-	//	request.Serialize(buffer, sizeof(buffer));
+	RequestGetMessages request(m_uuid);
+	std::vector<uint8_t> responseVec;
+
+	// Sending request and waiting for response.
+	Client::ReturnStatus ret = Exchange(request, responseVec);
+
+	if (ret != Client::ReturnStatus::Success) {
+		return ret;
+	}
+
+	// The exchange function has aleady validated the data is deserializeable and the lengths match.
+	auto payloadSize = responseVec.size() - sizeof(BaseResponseHeader);
+
+	auto bytesLeft = payloadSize;
+	auto bytesRead = 0;
+
+	while (bytesLeft > 0) {
+
+	}
+	
+	//uint8_t responseBuf[MAX_MESSAGE_LENGTH] = { 0 };
+	//
+	//// Sending request and waiting for response.
+	//Client::ReturnStatus ret = Exchange(request, responseBuf, sizeof(responseBuf), resHeader);
+	//
+	//if (ret != Client::ReturnStatus::Success) {
+	//	return ret;
+	//}
+	//
+	//size_t bytesLeft = resHeader.payloadSize;
+	//size_t bytesRead = 0;
+
 
 	return Client::ReturnStatus::Success;
 }
@@ -589,11 +619,10 @@ Client::ReturnStatus Client::HandleSendSymKey() {
 	return Client::ReturnStatus::GeneralError;
 }
 
+Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec) {
 
-
-Client::ReturnStatus Client::Exchange(const uint8_t* request, const size_t reqSize, uint8_t* o_response, const size_t resSize, BaseResponseHeader& o_header) {
-
-	size_t read = 0;
+	BaseResponseHeader tempHeader;
+	responseVec.clear();
 
 	try {
 		boost::asio::io_context io_context;
@@ -603,11 +632,31 @@ Client::ReturnStatus Client::Exchange(const uint8_t* request, const size_t reqSi
 
 		socket.connect(endpoint);
 
-		boost::asio::write(socket, boost::asio::buffer(request, reqSize));
-		read = boost::asio::read(socket, boost::asio::buffer(o_response, resSize), boost::asio::transfer_at_least(sizeof(o_header)));
+		std::cout << "Sending " << requestVec.size() << " bytes" << std::endl;
+		boost::asio::write(socket, boost::asio::buffer(requestVec.data(), requestVec.size()));
 
-		//socket.write_some(boost::asio::buffer(request, reqSize));
-		//socket.read_some(boost::asio::buffer(response, resSize), boost::asio::transfer_at_least(sizeof(header));
+		// Reading header.
+		boost::asio::streambuf header;
+		boost::asio::read(socket, header, boost::asio::transfer_exactly(sizeof(tempHeader)));
+		
+		const unsigned char* header_data = boost::asio::buffer_cast<const unsigned char*>(header.data());
+		responseVec.insert(responseVec.end(), header_data, header_data + sizeof(tempHeader));
+
+		if (tempHeader.Deserialize(responseVec) != true) {
+			throw std::runtime_error("Failed deserialize");
+		}
+
+		std::cout << "Received " << responseVec.size() << " bytes" << std::endl;
+		std::cout << "Expecting " << tempHeader.GetPayloadSize() << " more" << std::endl;
+
+		// Reading payload.
+		boost::asio::streambuf payload;
+		boost::asio::read(socket, payload, boost::asio::transfer_exactly(tempHeader.GetPayloadSize()));
+
+		const unsigned char* payload_data = boost::asio::buffer_cast<const unsigned char*>(payload.data());
+		responseVec.insert(responseVec.end(), payload_data, payload_data + tempHeader.GetPayloadSize());
+		
+		std::cout << "Received " << payload.size() << " bytes" << std::endl;
 
 		socket.close();
 	}
@@ -617,19 +666,9 @@ Client::ReturnStatus Client::Exchange(const uint8_t* request, const size_t reqSi
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	// Deserialize only header to check opcode.
-	if (o_header.Deserialize(o_response, sizeof(o_header)) == false) {
-		return Client::ReturnStatus::GeneralError;
-	}
-
 	// Make sure the server hasn't responded with an error.
-	if (o_header.code == (uint16_t)Opcode::ResponseFailure) {
+	if (tempHeader.GetCode() == Opcode::ResponseFailure) {
 		return Client::ReturnStatus::ServerError;
-	}
-
-	// Validating as much as possible.
-	if (read != o_header.payloadSize + sizeof(o_header)) {
-		return Client::ReturnStatus::GeneralError;
 	}
 
 	return Client::ReturnStatus::Success;
