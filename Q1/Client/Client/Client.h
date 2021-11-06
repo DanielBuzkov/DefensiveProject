@@ -2,6 +2,8 @@
 
 #include <list>
 #include <string>
+#include <unordered_map>
+
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
 
@@ -77,8 +79,6 @@ private:
 
 	bool ParseMeInfo();
 
-	bool GetFriendFromName(std::string name, Friend* o_friend);
-
 	template<Opcode _reqCode, typename ReqBody, Opcode _resCode, typename ResBody>
 	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response);
 
@@ -92,7 +92,7 @@ private:
 
 	bool UpdateMeInfo(uuid_t newUuid);
 
-	bool FriendExists(std::string name);
+	std::string GetNameFromUuid(const uuid_t &uuid);
 
 	ReturnStatus HandleRegister();
 	ReturnStatus HandleList();
@@ -112,8 +112,8 @@ private:
 	std::string m_ipAddr;
 	uint16_t m_port;
 
-	// Save all clients to communicate with
-	std::list<Friend*> m_friends;
+	// The client uses names as identifiers.
+	std::unordered_map<std::string, Friend*> m_data;
 
 	RSAPrivateWrapper *m_privateKey;
 

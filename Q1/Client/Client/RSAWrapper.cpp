@@ -49,7 +49,6 @@ std::string RSAPublicWrapper::encrypt(const char* plain, unsigned int length)
 }
 
 
-
 RSAPrivateWrapper::RSAPrivateWrapper()
 {
 	_privateKey.Initialize(_rng, BITS);

@@ -17,15 +17,15 @@ public:
 
 	bool HasSym();
 	bool HasPuiblic();
-	bool IsNameEqual(const std::string& otherName) const;
+	bool IsUuidEqual(const uuid_t &otherUuid) const;
 
 	bool GetUuid(uuid_t o_uuidBuff);
-	bool GetName(name_t o_nameBuff);
+	std::string GetName();
 	RSAPublicWrapper* GetPublicKey();
 	AESWrapper* GetSymKey();
 	
 	void SetPublicKey(const publicKey_t key);
-	void SetSymKey(const uint8_t* key, size_t keyLen);
+	void SetSymKey(const unsigned char* key, size_t keyLen);
 
 private:
 	bool m_isInit;

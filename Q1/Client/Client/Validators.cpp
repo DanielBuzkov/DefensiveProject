@@ -63,14 +63,6 @@ bool Name::Serialize(uint8_t* buffer, const size_t buffSize) const {
 	return true;
 }
 
-const bool Name::IsEqual(const std::string& otherName) const {
-	if (otherName.length() > MAX_NAME_STR_SIZE) {
-		return false;
-	}
-
-	return memcmp(m_data, otherName.c_str(), otherName.length()) == 0;
-}
-
 void Name::Reset() {
 	m_isInit = false;
 	memset(m_data, 0, sizeof(m_data));
@@ -165,4 +157,8 @@ bool UUID::Serialize(uint8_t* buffer, const size_t buffLen) const{
 	memcpy(buffer, m_data, sizeof(m_data));
 
 	return true;
+}
+
+const bool UUID::IsEqual(const uuid_t& otherUuid) const {
+	return memcmp(m_data, otherUuid, sizeof(uuid_t)) == 0;
 }

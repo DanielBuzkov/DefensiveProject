@@ -43,8 +43,6 @@ public:
 	*/
 	bool Serialize(uint8_t *buffer, const size_t buffLen) const;
 
-	const bool IsEqual(const std::string& otherName) const;
-
 	void Reset();
 
 private:
@@ -85,6 +83,8 @@ public:
 	bool Deserialize(const char* buffer, const size_t buffLen);
 
 	bool Serialize(uint8_t* buffer, const size_t buffLen) const;
+
+	const bool IsEqual(const uuid_t& otherUuid) const;
 
 private:
 	bool m_isInit;

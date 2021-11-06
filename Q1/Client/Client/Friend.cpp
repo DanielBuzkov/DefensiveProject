@@ -30,8 +30,8 @@ bool Friend::Init(std::string name, uint8_t* uuidBuffer, size_t buffLen) {
 	return true;
 }
 
-bool Friend::IsNameEqual(const std::string& otherName) const {
-	return m_name.IsEqual(otherName);
+bool Friend::IsUuidEqual(const uuid_t &otherUuid) const {
+	return m_uuid.IsEqual(otherUuid);
 }
 
 bool Friend::HasSym() {
@@ -46,15 +46,15 @@ bool Friend::GetUuid(uuid_t o_uuidBuff) {
 	return m_uuid.Serialize(o_uuidBuff, sizeof(uuid_t));
 }
 
-bool Friend::GetName(name_t o_nameBuff) { 
-	return m_name.Serialize(o_nameBuff, sizeof(name_t));
+std::string Friend::GetName() { 
+	uint8_t tmpNameBuffer[MAX_NAME_BUFFER_SIZE] = { 0 };
+	m_name.Serialize(tmpNameBuffer, sizeof(name_t));
+
+	std::string ret((char*)tmpNameBuffer);
+	return ret;
 }
 
 RSAPublicWrapper* Friend::GetPublicKey() { 
-
-	if (m_publicKey != nullptr) {
-		std::cout << "WE'RE FUCKD!!!!!" << std::endl;
-	}
 
 	return m_publicKey; 
 }
@@ -78,10 +78,10 @@ void Friend::SetPublicKey(const publicKey_t key) {
 	m_publicKey = new RSAPublicWrapper((char*)key, sizeof(publicKey_t));
 }
 
-void Friend::SetSymKey(const uint8_t* key, size_t keyLen) {
+void Friend::SetSymKey(const unsigned char* key, size_t keyLen) {
 	if (m_symkey != nullptr) {
 		return;
 	}
 
-	m_symkey = new AESWrapper((unsigned char*)key, keyLen);
+	m_symkey = new AESWrapper(key, keyLen);
 }

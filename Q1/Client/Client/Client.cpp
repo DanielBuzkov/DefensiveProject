@@ -25,8 +25,8 @@ Client::~Client() {
 		delete m_privateKey;
 	}
 
-	for (Friend* currFriend : m_friends) {
-		delete currFriend;
+	for (auto& currTuple : m_data) {
+		delete currTuple.second;
 	}
 }
 
@@ -362,25 +362,14 @@ bool Client::UpdateMeInfo(uuid_t newUuid) {
 	return true;
 }
 
-bool Client::FriendExists(std::string name) {
-	for (Friend* currFriend : m_friends) {
-		if (currFriend->IsNameEqual(name) == true) {
-			return true;
+std::string Client::GetNameFromUuid(const uuid_t &uuid) {
+	for (const auto& currTuple : m_data) {
+		Friend* currFirend = currTuple.second;
+
+		if (currFirend->IsUuidEqual(uuid) == true) {
+			return currFirend->GetName();
 		}
 	}
-
-	return false;
-}
-
-bool Client::GetFriendFromName(std::string name, Friend* o_friend) {
-	for (Friend* currFriend : m_friends) {
-		if (currFriend->IsNameEqual(name) == true) {
-			o_friend = currFriend;
-			return true;
-		}
-	}
-
-	return false;
 }
 
 //--------------------------------------------- HANDLERS ---------------------------------------------
@@ -472,7 +461,7 @@ Client::ReturnStatus Client::HandleList() {
 		std::cout << currName << std::endl;
 
 		// No need handling this friend, since names are also unique.
-		if (FriendExists(currName) == true) {
+		if (m_data.find(currName) != m_data.end()) {
 			continue;
 		}
 
@@ -485,7 +474,7 @@ Client::ReturnStatus Client::HandleList() {
 			continue;
 		}
 
-		m_friends.push_back(currFriend);
+		m_data[currName] = currFriend;
 	}
 	
 	return Client::ReturnStatus::Success;
@@ -500,27 +489,24 @@ Client::ReturnStatus Client::HandlePublicKey() {
 	std::cout << "Insert destenation name: ";
 	std::cin >> name;
 
-	for (Friend* currFriend : m_friends) {
-		if (currFriend->IsNameEqual(name) == true) {
-			if (currFriend->GetUuid(request.body.uuid) == false) {
-
-				std::cout << "Failed getting UUID for user" << std::endl;
-				return Client::ReturnStatus::GeneralError;
-			}
-
-			ReturnStatus ret = Exchange(request, response);
-
-			if (ret == ReturnStatus::Success) {
-				currFriend->SetPublicKey(response.body.publicKey);
-			}
-
-			return ret;
-		}
+	if (m_data.find(name) == m_data.end()) {
+		std::cout << "Name not found" << std::endl;
+		return Client::ReturnStatus::GeneralError;
 	}
 
-	std::cout << "Friend not found" << std::endl;
+	if (m_data[name]->GetUuid(request.body.uuid) == false) {
 
-	return Client::ReturnStatus::GeneralError;
+		std::cout << "Failed getting UUID for user" << std::endl;
+		return Client::ReturnStatus::GeneralError;
+	}
+
+	ReturnStatus ret = Exchange(request, response);
+
+	if (ret == ReturnStatus::Success) {
+		m_data[name]->SetPublicKey(response.body.publicKey);
+	}
+
+	return ret;
 }
 
 Client::ReturnStatus Client::HandleWaitingMessages() {
@@ -561,8 +547,15 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 		bytesRead += MessageHeader::GetSize();
 
 		// Get friend name from UUID
-		std::string friendName = "Babcha";
-		std::cout << "From : " << friendName << std::endl;
+		std::string clientName = GetNameFromUuid(currHeader.uuid);
+
+		if (clientName == "" ||
+			m_data.find(clientName) == m_data.end()) {
+			std::cout << "Failed getting client's name" << std::endl;
+			return Client::ReturnStatus::GeneralError;
+		}
+
+		std::cout << "From : " << clientName << std::endl;
 		std::cout << "Content : " << std::endl;
 
 		switch (currHeader.GetMessageType())
@@ -573,14 +566,34 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 		}
 
 		case MessageType::SendSymKey: {
-			std::cout << "symmetric key received";
 			std::vector<uint8_t> content(consume.begin() + MessageHeader::GetSize(), consume.end());
+
+			std::cout << " A " << currHeader.contentSize << " - " << content.size() << std::endl;
+
+			for (auto i = 0; i < 16; i++) {
+				if (i > 0 && i % 8 == 0) {
+					printf("\n");
+				}
+
+				printf("0x%02x, ", content[i]);
+			}
+			printf("\n");
+
+			//The received data is encrypted with my public key.
+			std::string symKey = m_privateKey->decrypt((char*)content.data(), currHeader.contentSize);
+			std::cout << " B " << std::endl;
+			m_data[clientName]->SetSymKey((unsigned char*)symKey.c_str(), symKey.size());
+
+			std::cout << "symmetric key received";
 			break;
 		}
 
 		case MessageType::SendText: {
-			std::cout << "Le content";
 			std::vector<uint8_t> content(consume.begin() + MessageHeader::GetSize(), consume.end());
+			
+			std::string plain = m_data[clientName]->GetSymKey()->decrypt((char*)content.data(), currHeader.contentSize);
+			
+			std::cout << plain;
 			break;
 		}
 
@@ -592,19 +605,6 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 		bytesRead += currHeader.contentSize;
 		std::cout << std::endl;
 	}
-	
-	//uint8_t responseBuf[MAX_MESSAGE_LENGTH] = { 0 };
-	//
-	//// Sending request and waiting for response.
-	//Client::ReturnStatus ret = Exchange(request, responseBuf, sizeof(responseBuf), resHeader);
-	//
-	//if (ret != Client::ReturnStatus::Success) {
-	//	return ret;
-	//}
-	//
-	//size_t bytesLeft = resHeader.payloadSize;
-	//size_t bytesRead = 0;
-
 
 	return Client::ReturnStatus::Success;
 }
@@ -626,6 +626,11 @@ Client::ReturnStatus Client::HandleSendMessage() {
 		return Client::ReturnStatus::GeneralError;
 	}
 
+	if (m_data.find(name) == m_data.end()) {
+		std::cout << "Username not found" << std::endl;
+		return Client::ReturnStatus::GeneralError;
+	}
+
 	std::cout << "Insert message to send: ";
 	std::cin >> message;
 
@@ -636,31 +641,21 @@ Client::ReturnStatus Client::HandleSendMessage() {
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	for (Friend* currFriend : m_friends) {
-		if (currFriend->IsNameEqual(name) == true) {
-
-			if (currFriend->HasSym() != true) {
-				std::cout << "Friend has no sym key set" << std::endl;
-				return Client::ReturnStatus::GeneralError;
-			}
-
-			std::string cipher = currFriend->GetSymKey()->encrypt(message.c_str(), message.size());
-
-			/**if (currFriend->GetUuid(request.body.messageHeader.uuid) == false) {
-
-				std::cout << "Failed getting UUID for user" << std::endl;
-				return Client::ReturnStatus::GeneralError;
-			}
-
-			return Exchange(request, response);
-			*/
-
-			return Client::ReturnStatus::GeneralError;
-		}
+	if (m_data[name]->HasSym() != true) {
+		std::cout << "Friend has no sym key set" << std::endl;
+		return Client::ReturnStatus::GeneralError;
 	}
 
-	std::cout << "Failed getting user" << std::endl;
-	return Client::ReturnStatus::GeneralError;
+	std::string cipher = m_data[name]->GetSymKey()->encrypt(message.c_str(), message.size());
+
+	/**if (currFriend->GetUuid(request.body.messageHeader.uuid) == false) {
+
+		std::cout << "Failed getting UUID for user" << std::endl;
+		return Client::ReturnStatus::GeneralError;
+	}
+
+	return Exchange(request, response);
+	*/
 }
 
 Client::ReturnStatus Client::HandleRequestSymKey() {
@@ -673,20 +668,18 @@ Client::ReturnStatus Client::HandleRequestSymKey() {
 	std::cout << "Insert destenation name: ";
 	std::cin >> name;
 
-	for (Friend* currFriend : m_friends) {
-		if (currFriend->IsNameEqual(name) == true) {
-			if (currFriend->GetUuid(request.body.messageHeader.uuid) == false) {
+	if (m_data.find(name) == m_data.end()) {
+		std::cout << "Username not found" << std::endl;
+		return Client::ReturnStatus::GeneralError;
+	}
+	
+	if (m_data[name]->GetUuid(request.body.messageHeader.uuid) == false) {
 
-				std::cout << "Failed getting UUID for user" << std::endl;
-				return Client::ReturnStatus::GeneralError;
-			}
-
-			return Exchange(request, response);
-		}
+		std::cout << "Failed getting UUID for user" << std::endl;
+		return Client::ReturnStatus::GeneralError;
 	}
 
-	std::cout << "Failed getting user" << std::endl;
-	return Client::ReturnStatus::GeneralError;
+	return Exchange(request, response);
 }
 
 Client::ReturnStatus Client::HandleSendSymKey() {
@@ -699,31 +692,37 @@ Client::ReturnStatus Client::HandleSendSymKey() {
 	std::cout << "Insert destenation name: ";
 	std::cin >> name;
 
-	for (Friend* currFriend : m_friends) {
-		if (currFriend->IsNameEqual(name) == true) {
-			if (currFriend->GetUuid(request.body.messageHeader.uuid) == false) {
-
-				std::cout << "Failed getting UUID for user" << std::endl;
-				return Client::ReturnStatus::GeneralError;
-			}
-
-			if (currFriend->HasPuiblic() != true) {
-				std::cout << "Ask for public key first!" << std::endl;
-				return Client::ReturnStatus::GeneralError;
-			}
-
-			AESWrapper* symKey = currFriend->GetSymKey();
-			memcpy((char*)&request.body.content, symKey->getKey(), 16);
-
-			std::string cipher = currFriend->GetPublicKey()->encrypt((char*)&request.body.content, request.body.messageHeader.contentSize);
-			memcpy((char*)&request.body.content, cipher.c_str(), request.body.messageHeader.contentSize);
-
-			return Exchange(request, response);
-		}
+	if (m_data.find(name) == m_data.end()) {
+		std::cout << "Username not found" << std::endl;
+		return Client::ReturnStatus::GeneralError;
 	}
 
-	std::cout << "Failed getting user" << std::endl;
-	return Client::ReturnStatus::GeneralError;
+	if (m_data[name]->GetUuid(request.body.messageHeader.uuid) != true) {
+		std::cout << "Failed getting UUID for user" << std::endl;
+		return Client::ReturnStatus::GeneralError;
+	}
+
+	if (m_data[name]->HasPuiblic() != true) {
+		std::cout << "Ask for public key first!" << std::endl;
+		return Client::ReturnStatus::GeneralError;
+	}
+
+	AESWrapper* symKey = m_data[name]->GetSymKey();
+	memcpy((char*)&request.body.content, symKey->getKey(), 16);
+
+	std::string cipher = m_data[name]->GetPublicKey()->encrypt((char*)&request.body.content, request.body.messageHeader.contentSize);
+	memcpy((char*)&request.body.content, cipher.c_str(), request.body.messageHeader.contentSize);
+
+	for (auto i = 0; i < 16; i++) {
+		if (i > 0 && i % 8 == 0) {
+			printf("\n");
+		}
+
+		printf("0x%02x, ", ((uint8_t*)&request.body.content)[i]);
+	}
+	printf("\n");
+
+	return Exchange(request, response);
 }
 
 Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec) {
