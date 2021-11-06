@@ -44,10 +44,10 @@ typedef struct _EmptyMessage {
 
 // Type 2
 typedef struct s {
-	symkey_t symKey;
+	uint8_t encSymKey[128];
 
 	static constexpr size_t GetSize() {
-		return sizeof(symKey);
+		return sizeof(encSymKey);
 	}
 } SendSymKeyMessage;
 

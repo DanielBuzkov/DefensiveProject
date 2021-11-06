@@ -568,20 +568,7 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 		case MessageType::SendSymKey: {
 			std::vector<uint8_t> content(consume.begin() + MessageHeader::GetSize(), consume.end());
 
-			std::cout << " A " << currHeader.contentSize << " - " << content.size() << std::endl;
-
-			for (auto i = 0; i < 16; i++) {
-				if (i > 0 && i % 8 == 0) {
-					printf("\n");
-				}
-
-				printf("0x%02x, ", content[i]);
-			}
-			printf("\n");
-
-			//The received data is encrypted with my public key.
-			std::string symKey = m_privateKey->decrypt((char*)content.data(), currHeader.contentSize);
-			std::cout << " B " << std::endl;
+			std::string symKey = m_privateKey->decrypt((char*)content.data(), 128);
 			m_data[clientName]->SetSymKey((unsigned char*)symKey.c_str(), symKey.size());
 
 			std::cout << "symmetric key received";
@@ -710,17 +697,8 @@ Client::ReturnStatus Client::HandleSendSymKey() {
 	AESWrapper* symKey = m_data[name]->GetSymKey();
 	memcpy((char*)&request.body.content, symKey->getKey(), 16);
 
-	std::string cipher = m_data[name]->GetPublicKey()->encrypt((char*)&request.body.content, request.body.messageHeader.contentSize);
+	std::string cipher = m_data[name]->GetPublicKey()->encrypt((char*)&request.body.content, 16);
 	memcpy((char*)&request.body.content, cipher.c_str(), request.body.messageHeader.contentSize);
-
-	for (auto i = 0; i < 16; i++) {
-		if (i > 0 && i % 8 == 0) {
-			printf("\n");
-		}
-
-		printf("0x%02x, ", ((uint8_t*)&request.body.content)[i]);
-	}
-	printf("\n");
 
 	return Exchange(request, response);
 }

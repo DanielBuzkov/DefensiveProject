@@ -131,7 +131,7 @@ class ClientHandler:
             return None
 
         elif (body.message_type == MessageType.SendSK and
-            body.content_size != SYM_KEY_LENGTH):
+            body.content_size != 128):
             return None
 
         # Switching id's, so the message itself will contain the sender's id
