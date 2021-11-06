@@ -2,6 +2,7 @@
 
 import socket
 import os
+import threading
 
 from utils.sql_handler import SqlHandler
 from client_handler import ClientHandler
@@ -40,19 +41,14 @@ def run_server(port_number: int):
 	sock.bind(("0.0.0.0", port_number))
 	sock.listen(50)
 
-	handler = ClientHandler()
-	# sql_handler = MutexableSql()
+	client_handler = ClientHandler()
+	sql_handler = SqlHandler()
+
+	sql_handler.init()
 
 	while True:
 		client_socket, addr = sock.accept()
-
-		handler.handle_client(client_socket)
-
-		client_socket.close()
-
-		# new_thread = client_handler.ClientThread(connection)
-		# new_thread.start()
-		# threads.append(new_thread)
+		threading.Thread(target=client_handler.handle_client_thread, args=(client_socket,)).start()
 
 	sock.close()
 

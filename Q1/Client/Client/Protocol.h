@@ -40,6 +40,11 @@ enum class Opcode : uint16_t {
 	only received and thus only the default c'tor shall be used.
 */
 
+class BaseRequestHeader {
+
+};
+
+
 template<Opcode _code, size_t _size>
 class RequestHeader {
 public:
@@ -106,7 +111,7 @@ protected:
 	uint16_t code;
 	uint32_t payloadSize;
 };
-#include <iostream>
+
 template<Opcode _code, size_t _size>
 class ResponseHeader : public BaseResponseHeader {
 public:
@@ -114,7 +119,6 @@ public:
 	bool Deserialize(const std::vector<uint8_t>& inVector) {
 
 		if (inVector.size() < sizeof(version) + sizeof(code) + sizeof(payloadSize)) {
-			std::cout << "Invalid size" << std::endl;
 			return false;
 		}
 
@@ -130,7 +134,7 @@ public:
 		// Server's version should not bother the client
 		if (code != (uint16_t)_code ||
 			payloadSize != (uint32_t)_size) {
-			
+
 			version = 0;
 			code = 0;
 			payloadSize = 0;

@@ -16,6 +16,7 @@ public:
 	bool Init(std::string name, uint8_t* uuidBuffer, size_t buffLen);
 
 	bool HasSym();
+	bool HasPuiblic();
 	bool IsNameEqual(const std::string& otherName) const;
 
 	bool GetUuid(uuid_t o_uuidBuff);

@@ -86,6 +86,7 @@ class ClientHandler:
 
         # if there is already a user with this name
         if self.username_exists(body.name):
+            print("User name exits")
             return None
 
         new_id = uuid.uuid1()
@@ -112,7 +113,7 @@ class ClientHandler:
 
         return response.raw
 
-    def handle_send_message(self, payload):
+    def handle_send_message(self, payload, uuid):
         body = SendMessageReqBody(payload)
         # TODO : Generate Message ID
         response = SendMessageResBody(body.client_id, 69)
@@ -133,12 +134,22 @@ class ClientHandler:
             body.content_size != SYM_KEY_LENGTH):
             return None
 
-        self.push_message(UUID(bytes=body.client_id), body)
+        # Switching id's, so the message itself will contain the sender's id
+        dest_id = body.client_id
+        body.client_id = uuid
+
+        self.push_message(UUID(bytes=dest_id), body)
 
         return response.raw
 
     def handle_get_messages(self, uuid):
         return self.get_messages_from_uuid(UUID(bytes=uuid))
+
+    def handle_client_thread(self, client_socket : socket):
+        try:
+            self.handle_client(client_socket)
+        finally:
+            client_socket.close()
 
     def handle_client(self, client_socket : socket):
         # Validate header:
@@ -184,7 +195,7 @@ class ClientHandler:
                 response_opcode = Opcodes.GetPKRes
 
             elif header.code == Opcodes.SendMessageReq:
-                response_body = self.handle_send_message(payload)
+                response_body = self.handle_send_message(payload, header.client_id)
                 response_opcode = Opcodes.SendMessageRes
 
             elif header.code == Opcodes.GetMessagesReq:
@@ -193,10 +204,12 @@ class ClientHandler:
 
             else:
                 self.send_error(client_socket)
+                print("Invalid option")
                 return
 
             if response_body is None:
                 self.send_error(client_socket)
+                print("Handling failed")
             else:
                 response_header = ResponseHeader(code=response_opcode, payload_size=len(response_body))
                 client_socket.send(response_header.raw + bytes(response_body))

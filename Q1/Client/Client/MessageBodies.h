@@ -12,8 +12,6 @@ enum class MessageType : uint8_t {
 
 #pragma pack(push, 1)
 
-// TODO : ADD MORE MESSAGE TYPES (dynamic ones)
-
 // REQUESTS:
 
 // Opcode 1000
@@ -37,26 +35,6 @@ typedef struct _RequestPKBody {
 } RequestPKBody;
 
 // Opcode 1003
-class MessageHeader {
-	uuid_t uuid;
-	uint8_t messageType;
-	uint32_t contentSize;
-};
-
-template <MessageType _type, typename Content>
-struct MessageToClient {
-	MessageToClient() : messageType((uint8_t)_type), contentSize(Content::GetSize()) {}
-
-	uuid_t uuid;
-	uint8_t messageType;
-	uint32_t contentSize;
-	Content content;
-
-	static constexpr size_t GetSize() {
-		return sizeof(uuid) + sizeof(messageType) + sizeof(contentSize) + Content::GetSize();
-	}
-};
-
 // Type 1
 typedef struct _EmptyMessage {
 	static constexpr size_t GetSize() {
@@ -65,13 +43,101 @@ typedef struct _EmptyMessage {
 } EmptyMessage;
 
 // Type 2
-typedef struct _SendSymKeyMessage {
+typedef struct s {
 	symkey_t symKey;
 
 	static constexpr size_t GetSize() {
 		return sizeof(symKey);
 	}
 } SendSymKeyMessage;
+
+typedef struct _SendTextMessage {
+	std::vector<uint8_t> data;
+
+	size_t GetSize() {
+		return data.size();
+	}
+} SendTextMessage;
+
+
+class MessageHeader {
+public:
+	MessageHeader() : uuid{ 0 }, messageType(0), contentSize(0) { };
+	MessageHeader(uint8_t type, uint32_t size) : messageType(type), contentSize(size) {};
+
+	static constexpr size_t GetSize() {
+		return sizeof(uuid) + sizeof(messageType) + sizeof(contentSize);
+	}
+
+	bool Deserialize(const std::vector<uint8_t>& inVector) {
+
+		if (inVector.size() < MessageHeader::GetSize()) {
+			return false;
+		}
+
+		memcpy((uint8_t*)&uuid, inVector.data(), sizeof(uuid));
+		memcpy((uint8_t*)&messageType, inVector.data() + sizeof(uuid), sizeof(messageType));
+		memcpy((uint8_t*)&contentSize, inVector.data() + sizeof(uuid) + sizeof(messageType), sizeof(contentSize));
+
+		switch (messageType)
+		{
+		case (uint8_t)MessageType::GetSymKey:
+			if (contentSize != EmptyMessage::GetSize()) {
+				memset(uuid, 0, sizeof(uuid));
+				messageType = 0;
+				contentSize = 0;
+
+				return false;
+			}
+			break;
+
+		case (uint8_t)MessageType::SendSymKey:
+			if (contentSize != SendSymKeyMessage::GetSize()) {
+				memset(uuid, 0, sizeof(uuid));
+				messageType = 0;
+				contentSize = 0;
+
+				return false;
+			}
+			break;
+
+		case (uint8_t)MessageType::SendText:
+			break;
+
+		case (uint8_t)MessageType::SendFile:
+			break;
+
+		default:
+			memset(uuid, 0, sizeof(uuid));
+			messageType = 0;
+			contentSize = 0;
+
+			return false;
+		}
+
+		return true;
+	}
+
+	MessageType GetMessageType() {
+		return (MessageType)messageType;
+	}
+
+	uuid_t uuid;
+	uint8_t messageType;
+	uint32_t contentSize;
+};
+
+template <MessageType _type, typename Content>
+struct MessageToClient {
+	MessageToClient() : messageHeader((uint8_t)_type, Content::GetSize()) {}
+
+	MessageHeader messageHeader;
+	Content content;
+
+	static constexpr size_t GetSize() {
+		return MessageHeader::GetSize() + Content::GetSize();
+	}
+};
 
 typedef MessageToClient<MessageType::GetSymKey, EmptyMessage> RequestGetSymKeyBody;
 typedef MessageToClient<MessageType::SendSymKey, SendSymKeyMessage> RequestSendSymKeyBody;

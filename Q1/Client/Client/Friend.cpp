@@ -3,10 +3,12 @@
 Friend::~Friend() {
 	if (m_publicKey) {
 		delete m_publicKey;
+		m_publicKey = nullptr;
 	}
 
 	if (m_symkey) {
 		delete m_symkey;
+		m_symkey = nullptr;
 	}
 }
 
@@ -36,6 +38,10 @@ bool Friend::HasSym() {
 	return m_symkey != nullptr;
 }
 
+bool Friend::HasPuiblic() {
+	return m_publicKey != nullptr;
+}
+
 bool Friend::GetUuid(uuid_t o_uuidBuff) { 
 	return m_uuid.Serialize(o_uuidBuff, sizeof(uuid_t));
 }
@@ -44,8 +50,25 @@ bool Friend::GetName(name_t o_nameBuff) {
 	return m_name.Serialize(o_nameBuff, sizeof(name_t));
 }
 
-RSAPublicWrapper* Friend::GetPublicKey() { return m_publicKey; }
-AESWrapper* Friend::GetSymKey() { return m_symkey; }
+RSAPublicWrapper* Friend::GetPublicKey() { 
+
+	if (m_publicKey != nullptr) {
+		std::cout << "WE'RE FUCKD!!!!!" << std::endl;
+	}
+
+	return m_publicKey; 
+}
+
+AESWrapper* Friend::GetSymKey() { 
+	
+	if (m_symkey != nullptr) {
+		return m_symkey;
+	}
+
+	m_symkey = new AESWrapper();
+	
+	return m_symkey; 
+}
 
 void Friend::SetPublicKey(const publicKey_t key) {
 	if (m_publicKey != nullptr) {

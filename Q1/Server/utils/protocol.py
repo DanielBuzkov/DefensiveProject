@@ -152,8 +152,8 @@ class SendMessageReqBody:
     def __init__(self, bytestream):
         (self.client_id,
          self.message_type,
-         self.content_size) = struct.unpack(self.format, bytestream)
-        self.content = bytestream[-self.content_size:]
+         self.content_size) = struct.unpack(self.format, bytestream[:21])
+        self.content = bytestream[21:]
         self.raw = bytestream
 
     @staticmethod

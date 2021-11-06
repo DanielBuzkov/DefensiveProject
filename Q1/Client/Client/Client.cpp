@@ -398,7 +398,7 @@ Client::ReturnStatus Client::HandleRegister() {
 	std::cin >> name;
 
 	if (m_name.Deserialize(name) == false) {
-		std::cout << "Invalid name" << std::endl;
+		std::cout << "Invalid name. Name should contain only alphabetic charecters." << std::endl;
 		return ReturnStatus::GeneralError;
 	}
 
@@ -535,14 +535,62 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 		return ret;
 	}
 
-	// The exchange function has aleady validated the data is deserializeable and the lengths match.
-	auto payloadSize = responseVec.size() - sizeof(BaseResponseHeader);
+	// The header has been validated at the exchange function.
+	std::vector<uint8_t> payload(responseVec.begin() + sizeof(BaseResponseHeader), responseVec.end());
 
-	auto bytesLeft = payloadSize;
+	// The exchange function has aleady validated the data is deserializeable and the lengths match.
+	auto bytesLeft = payload.size();
 	auto bytesRead = 0;
 
 	while (bytesLeft > 0) {
 
+		if (bytesLeft < MessageHeader::GetSize()) {
+			std::cout << "Reached an invalid tail length" << std::endl;
+			return Client::ReturnStatus::GeneralError;
+		}
+
+		MessageHeader currHeader;
+		std::vector<uint8_t> consume(payload.begin() + bytesRead, payload.end());
+
+		if (currHeader.Deserialize(consume) != true) {
+			std::cout << "Read invalid header from server" << std::endl;
+			return Client::ReturnStatus::GeneralError;
+		}
+
+		bytesLeft -= MessageHeader::GetSize();
+		bytesRead += MessageHeader::GetSize();
+
+		// Get friend name from UUID
+		std::string friendName = "Babcha";
+		std::cout << "From : " << friendName << std::endl;
+		std::cout << "Content : " << std::endl;
+
+		switch (currHeader.GetMessageType())
+		{
+		case MessageType::GetSymKey: {
+			std::cout << "Request for symmetric key";
+			break;
+		}
+
+		case MessageType::SendSymKey: {
+			std::cout << "symmetric key received";
+			std::vector<uint8_t> content(consume.begin() + MessageHeader::GetSize(), consume.end());
+			break;
+		}
+
+		case MessageType::SendText: {
+			std::cout << "Le content";
+			std::vector<uint8_t> content(consume.begin() + MessageHeader::GetSize(), consume.end());
+			break;
+		}
+
+		default:
+			break;
+		}
+
+		bytesLeft -= currHeader.contentSize;
+		bytesRead += currHeader.contentSize;
+		std::cout << std::endl;
 	}
 	
 	//uint8_t responseBuf[MAX_MESSAGE_LENGTH] = { 0 };
@@ -562,6 +610,56 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 }
 
 Client::ReturnStatus Client::HandleSendMessage() {
+
+	ResponseSendMessage response;
+
+	std::string name;
+	std::string message;
+
+	std::cout << "Insert destenation name: ";
+	std::cin >> name;
+
+	if (std::cin.fail()) {
+		std::cin.clear();
+		std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+		std::cout << "Bad entry" << std::endl;
+		return Client::ReturnStatus::GeneralError;
+	}
+
+	std::cout << "Insert message to send: ";
+	std::cin >> message;
+
+	if (std::cin.fail()) {
+		std::cin.clear();
+		std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+		std::cout << "Bad entry" << std::endl;
+		return Client::ReturnStatus::GeneralError;
+	}
+
+	for (Friend* currFriend : m_friends) {
+		if (currFriend->IsNameEqual(name) == true) {
+
+			if (currFriend->HasSym() != true) {
+				std::cout << "Friend has no sym key set" << std::endl;
+				return Client::ReturnStatus::GeneralError;
+			}
+
+			std::string cipher = currFriend->GetSymKey()->encrypt(message.c_str(), message.size());
+
+			/**if (currFriend->GetUuid(request.body.messageHeader.uuid) == false) {
+
+				std::cout << "Failed getting UUID for user" << std::endl;
+				return Client::ReturnStatus::GeneralError;
+			}
+
+			return Exchange(request, response);
+			*/
+
+			return Client::ReturnStatus::GeneralError;
+		}
+	}
+
+	std::cout << "Failed getting user" << std::endl;
 	return Client::ReturnStatus::GeneralError;
 }
 
@@ -577,7 +675,7 @@ Client::ReturnStatus Client::HandleRequestSymKey() {
 
 	for (Friend* currFriend : m_friends) {
 		if (currFriend->IsNameEqual(name) == true) {
-			if (currFriend->GetUuid(request.body.uuid) == false) {
+			if (currFriend->GetUuid(request.body.messageHeader.uuid) == false) {
 
 				std::cout << "Failed getting UUID for user" << std::endl;
 				return Client::ReturnStatus::GeneralError;
@@ -587,6 +685,7 @@ Client::ReturnStatus Client::HandleRequestSymKey() {
 		}
 	}
 
+	std::cout << "Failed getting user" << std::endl;
 	return Client::ReturnStatus::GeneralError;
 }
 
@@ -602,20 +701,28 @@ Client::ReturnStatus Client::HandleSendSymKey() {
 
 	for (Friend* currFriend : m_friends) {
 		if (currFriend->IsNameEqual(name) == true) {
-			if (currFriend->GetUuid(request.body.uuid) == false) {
+			if (currFriend->GetUuid(request.body.messageHeader.uuid) == false) {
 
 				std::cout << "Failed getting UUID for user" << std::endl;
 				return Client::ReturnStatus::GeneralError;
 			}
 
-			uint8_t encryptedBuffer[sizeof(RequestSendSymKey)] = { 0 };
+			if (currFriend->HasPuiblic() != true) {
+				std::cout << "Ask for public key first!" << std::endl;
+				return Client::ReturnStatus::GeneralError;
+			}
 
-			//currFriend->GetPublicKey()->encrypt(request.)
+			AESWrapper* symKey = currFriend->GetSymKey();
+			memcpy((char*)&request.body.content, symKey->getKey(), 16);
+
+			std::string cipher = currFriend->GetPublicKey()->encrypt((char*)&request.body.content, request.body.messageHeader.contentSize);
+			memcpy((char*)&request.body.content, cipher.c_str(), request.body.messageHeader.contentSize);
 
 			return Exchange(request, response);
 		}
 	}
 
+	std::cout << "Failed getting user" << std::endl;
 	return Client::ReturnStatus::GeneralError;
 }
 
