@@ -41,16 +41,10 @@ enum class Opcode : uint16_t {
 */
 
 class BaseRequestHeader {
-
-};
-
-
-template<Opcode _code, size_t _size>
-class RequestHeader {
 public:
-	RequestHeader() : clientId{ 0 }, version(CLIENT_VERSION), code((uint16_t)_code), payloadSize((uint32_t)_size) {}
-	RequestHeader(UUID _uuid) : version(CLIENT_VERSION), code((uint16_t)_code), payloadSize((uint32_t)_size) {
+	BaseRequestHeader(uint16_t _code, uint32_t _size) : clientId{ 0 }, version(CLIENT_VERSION), code(_code), payloadSize(_size) {}
 
+	BaseRequestHeader(UUID _uuid, uint16_t _code, uint32_t _size) : version(CLIENT_VERSION), code(_code), payloadSize(_size) {
 		if (_uuid.Serialize(clientId, sizeof(clientId)) == false) {
 			throw std::invalid_argument("Unable to handle currnt UUID for messages");
 		}
@@ -58,16 +52,30 @@ public:
 
 	const void Serialize(std::vector<uint8_t>& o_vector) const {
 		o_vector.clear();
-		o_vector.resize(sizeof(RequestHeader));
+		o_vector.resize(sizeof(BaseRequestHeader));
 
-		memcpy(&o_vector[0], this, sizeof(RequestHeader));
+		memcpy(&o_vector[0], this, sizeof(BaseRequestHeader));
 	}
 
-private:
+protected:
 	uuid_t clientId;
 	uint8_t version;
 	uint16_t code;
 	uint32_t payloadSize;
+};
+
+template<Opcode _code, size_t _size>
+class RequestHeader : BaseRequestHeader {
+public:
+	RequestHeader() : BaseRequestHeader((uint16_t)_code, (uint32_t)_size) {}
+	RequestHeader(UUID _uuid) : BaseRequestHeader(_uuid, (uint16_t)_code, (uint32_t)_size) {}
+
+	const void Serialize(std::vector<uint8_t>& o_vector) const {
+		o_vector.clear();
+		o_vector.resize(sizeof(RequestHeader));
+
+		memcpy(&o_vector[0], this, sizeof(RequestHeader));
+	}
 };
 
 class BaseResponseHeader {
@@ -201,6 +209,22 @@ public:
 	}
 };
 
+class DynamicRequest {
+public:
+	DynamicRequest(UUID _uuid, uint16_t _code, std::vector<uint8_t> _payload) : header(_uuid, _code, _payload.size()), payload(_payload) {}
+
+	const void Serialize(std::vector<uint8_t>& o_vector) const {
+		o_vector.resize(sizeof(header));
+		header.Serialize(o_vector);
+
+		o_vector.insert(o_vector.end(), payload.begin(), payload.end());
+	}
+
+private:
+	BaseRequestHeader header;
+	std::vector<uint8_t> payload;
+};
+
 #pragma pack(pop)
 
 typedef StaticRequest<Opcode::RequestRegister, RequestRegisterBody> RequestRegister;
@@ -208,8 +232,8 @@ typedef StaticRequest<Opcode::RequestList, EmptyBody> RequestList;
 typedef StaticRequest<Opcode::RequestPK, RequestPKBody> RequestPK;
 typedef StaticRequest<Opcode::RequestSendMessage, RequestGetSymKeyBody> RequestGetSymKey;
 typedef StaticRequest<Opcode::RequestSendMessage, RequestSendSymKeyBody> RequestSendSymKey;
-//MORE
-//MORE
+//typedef StaticRequest<Opcode::RequestSendMessage, RequestSendTextMessageBody> RequestSendTextMessageBody;
+
 typedef StaticRequest<Opcode::RequestGetMessages, EmptyBody> RequestGetMessages;
 
 typedef StaticResponse<Opcode::ResponseRegister, ResponseRegisterBody> ResponseRegister;

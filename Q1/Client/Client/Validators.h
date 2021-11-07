@@ -90,4 +90,3 @@ private:
 	bool m_isInit;
 	uuid_t m_data;
 };
-

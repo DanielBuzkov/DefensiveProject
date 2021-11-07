@@ -248,7 +248,7 @@ bool Client::ParseServerInfo() {
 		return false;
 	}
 
-	m_port = tmp;
+	m_port = (uint16_t)tmp;
 
 	return true;
 }
@@ -372,6 +372,8 @@ std::string Client::GetNameFromUuid(const uuid_t &uuid) {
 			return currFirend->GetName();
 		}
 	}
+
+	return "";
 }
 
 //--------------------------------------------- HANDLERS ---------------------------------------------
@@ -636,15 +638,16 @@ Client::ReturnStatus Client::HandleSendMessage() {
 	}
 
 	std::string cipher = m_data[name]->GetSymKey()->encrypt(message.c_str(), message.size());
+	std::vector<uint8_t> vec(cipher.begin(), cipher.end());
 
-	/**if (currFriend->GetUuid(request.body.messageHeader.uuid) == false) {
+	DynamicRequest request(m_uuid, (uint16_t)Opcode::RequestSendMessage, vec);
 
-		std::cout << "Failed getting UUID for user" << std::endl;
-		return Client::ReturnStatus::GeneralError;
-	}
+	std::vector<uint8_t> requestBuff;
+	request.Serialize(requestBuff);
 
-	return Exchange(request, response);
-	*/
+	std::cout << "about to send " << requestBuff.size() << " bytes!" << std::endl;
+
+	return Exchange(requestBuff, response);
 }
 
 Client::ReturnStatus Client::HandleRequestSymKey() {
@@ -718,7 +721,6 @@ Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, st
 
 		socket.connect(endpoint);
 
-		std::cout << "Sending " << requestVec.size() << " bytes" << std::endl;
 		boost::asio::write(socket, boost::asio::buffer(requestVec.data(), requestVec.size()));
 
 		// Reading header.
@@ -732,9 +734,6 @@ Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, st
 			throw std::runtime_error("Failed deserialize");
 		}
 
-		std::cout << "Received " << responseVec.size() << " bytes" << std::endl;
-		std::cout << "Expecting " << tempHeader.GetPayloadSize() << " more" << std::endl;
-
 		// Reading payload.
 		boost::asio::streambuf payload;
 		boost::asio::read(socket, payload, boost::asio::transfer_exactly(tempHeader.GetPayloadSize()));
@@ -742,8 +741,6 @@ Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, st
 		const unsigned char* payload_data = boost::asio::buffer_cast<const unsigned char*>(payload.data());
 		responseVec.insert(responseVec.end(), payload_data, payload_data + tempHeader.GetPayloadSize());
 		
-		std::cout << "Received " << payload.size() << " bytes" << std::endl;
-
 		socket.close();
 	}
 	catch (std::exception& e) {
