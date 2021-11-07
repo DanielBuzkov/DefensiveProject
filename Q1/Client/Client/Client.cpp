@@ -20,6 +20,8 @@ static constexpr size_t MIN_PORT_STR_LENGTH = 1;
 
 static constexpr size_t MAX_MESSAGE_LENGTH = 8192;
 
+Client::Client() : m_isInit(false), m_port(0), m_privateKey(nullptr) {}
+
 Client::~Client() {
 	if (m_privateKey != nullptr) {
 		delete m_privateKey;
@@ -469,7 +471,7 @@ Client::ReturnStatus Client::HandleList() {
 		Friend* currFriend = new Friend();
 
 		// Keep getting the other clients.
-		if (currFriend->Init(currName, currNode.uuid, sizeof(currNode.uuid)) != true) {
+		if (currFriend->Init(currName, currNode.uuid) != true) {
 			delete currFriend;
 			continue;
 		}

@@ -3,6 +3,11 @@
 #include "Defines.h"
 #include "Validators.h"
 
+/**
+* This file holds all the payloads of the messages in the communication.
+*/
+
+// An enum to represent all possible codes for messages between two clients.
 enum class MessageType : uint8_t {
 	GetSymKey = 1,
 	SendSymKey = 2,
@@ -59,11 +64,10 @@ typedef struct _SendTextMessage {
 	}
 } SendTextMessage;
 
-
 class MessageHeader {
 public:
 	MessageHeader() : uuid{ 0 }, messageType(0), contentSize(0) { };
-	MessageHeader(uint8_t type, uint32_t size) : messageType(type), contentSize(size) {};
+	MessageHeader(uint8_t type, uint32_t size) : uuid{ 0 }, messageType(type), contentSize(size) {};
 
 	static constexpr size_t GetSize() {
 		return sizeof(uuid) + sizeof(messageType) + sizeof(contentSize);
@@ -141,8 +145,6 @@ struct MessageToClient {
 
 typedef MessageToClient<MessageType::GetSymKey, EmptyMessage> RequestGetSymKeyBody;
 typedef MessageToClient<MessageType::SendSymKey, SendSymKeyMessage> RequestSendSymKeyBody;
-//MORE
-//MORE
 
 // Opcodes 1001, 1004, 9000
 typedef struct _EmptyBody {

@@ -112,6 +112,7 @@ protected:
 	uint32_t payloadSize;
 };
 
+
 template<Opcode _code, size_t _size>
 class ResponseHeader : public BaseResponseHeader {
 public:
@@ -212,8 +213,5 @@ typedef StaticRequest<Opcode::RequestSendMessage, RequestSendSymKeyBody> Request
 typedef StaticRequest<Opcode::RequestGetMessages, EmptyBody> RequestGetMessages;
 
 typedef StaticResponse<Opcode::ResponseRegister, ResponseRegisterBody> ResponseRegister;
-// typedef StaticResponse<Opcode::ResponseList, ResponseListBody> ResponseList;
 typedef StaticResponse<Opcode::ResponsePK, ResponsePKBody> ResponsePK;
 typedef StaticResponse<Opcode::ResponseSendMessage, ResponseSendMessageBody> ResponseSendMessage;
-// typedef StaticResponse<Opcode::ResponseGetMessage, ResponseGetMessageBody> ResponseGetMessage;
-typedef StaticResponse<Opcode::ResponseFailure, EmptyBody> ResponseFailure;

@@ -1,5 +1,7 @@
 #include "Friend.h"
 
+Friend::Friend() : m_isInit(false), m_publicKey(nullptr), m_symkey(nullptr) {}
+
 Friend::~Friend() {
 	if (m_publicKey) {
 		delete m_publicKey;
@@ -12,7 +14,7 @@ Friend::~Friend() {
 	}
 }
 
-bool Friend::Init(std::string name, uint8_t* uuidBuffer, size_t buffLen) {
+bool Friend::Init(const std::string name, const uuid_t uuid) {
 	
 	// Won't init twice
 	if (m_isInit == true) {
@@ -21,7 +23,7 @@ bool Friend::Init(std::string name, uint8_t* uuidBuffer, size_t buffLen) {
 	
 	// Initialize the fields which each friend MUST have.
 	if (m_name.Deserialize(name) == false ||
-		m_uuid.Deserialize((char*)uuidBuffer, buffLen) == false) {
+		m_uuid.Deserialize((char*)uuid, sizeof(uuid_t)) == false) {
 		return false;
 	}
 

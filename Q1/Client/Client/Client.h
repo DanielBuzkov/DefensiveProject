@@ -1,6 +1,5 @@
 #pragma once
 
-#include <list>
 #include <string>
 #include <unordered_map>
 
@@ -15,7 +14,7 @@
 
 class Client {
 public:
-	Client() : m_isInit(false), m_port(0), m_privateKey(nullptr) {}
+	Client();
 	~Client();
 
 	/**
@@ -30,9 +29,15 @@ public:
 	*/
 	bool Init();
 
+	/**
+		This function is the main handler of the client.
+		It has an infint loop which reads the user's choise and communicates with the server
+		as requested.
+	*/
 	void Run();
 
 private:
+	// All possible choises from the menu.
 	enum class MenuOptions {
 		Register = 10,
 		ClientList = 20,
@@ -44,6 +49,7 @@ private:
 		Exit = 0,
 	};
 
+	// Inner enum to keep track of the handling status.
 	enum class ReturnStatus {
 		Success,
 		ServerError,
@@ -77,30 +83,97 @@ private:
 	*/
 	bool ParseServerInfo();
 
+	/**
+		This function parses the content of `me.info` file and updates the instances fields.
+
+		@return	bool	-	True if file's content is valid and the fields successfully update, false otherwise.
+	*/
 	bool ParseMeInfo();
 
+	/**
+		A template function for sending a request and receiving a response from the server.
+		At this implementation the request and the response are pre-defined at compile time.
+
+		@param	request		-	A static request to be sent.
+		@param	response	-	A static response which will be filled by the received data.
+
+		@return	ReturnStatus	-	ServerError if the response is a valid error message from the server.
+								-	Success if the request has been handled successfuly.
+								-	GeneralError otherwise.
+	*/
 	template<Opcode _reqCode, typename ReqBody, Opcode _resCode, typename ResBody>
 	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response);
 
+	/**
+		A template function for sending a request and receiving a response with unknown length from the server.
+		At this implementation the request is pre-defined at compile time, but the response shall be
+		interpreted as it is being read.
+
+		@param	request		-	A static request to be sent.
+		@param	responseVec	-	A vector of the received data from the server.
+
+		@return	ReturnStatus	-	ServerError if the response is a valid error message from the server.
+								-	Success if the request has been handled successfuly.
+								-	GeneralError otherwise.
+	*/
 	template<Opcode _reqCode, typename ReqBody>
 	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, std::vector<uint8_t>& responseVec);
 
+	/**
+		A template function for sending a request of unknown length and receiving a response from the server.
+		At this implementation the response is pre-defined at compile time, but the request shall be
+		interpreted as it is being written.
+
+		@param	requestVec	-	A vector of the sent data to the server.
+		@param	response	-	A static response which will be filled by the received data.
+
+		@return	ReturnStatus	-	ServerError if the response is a valid error message from the server.
+								-	Success if the request has been handled successfuly.
+								-	GeneralError otherwise.
+	*/
 	template<Opcode _resCode, typename ResBody>
 	ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, StaticResponse<_resCode, ResBody>& response);
 
+	/**
+		A template function for sending a request of unknown length and receiving a response 
+		with unknown length from the server.
+		At this implementation the request and the response shall be interpreted at run time.
+
+		@param	requestVec	-	A vector of the sent data to the server.
+		@param	responseVec	-	A vector of the received data from the server.
+
+		@return	ReturnStatus	-	ServerError if the response is a valid error message from the server.
+								-	Success if the request has been handled successfuly.
+								-	GeneralError otherwise.
+	*/
 	ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec);
 
+	/**
+		This function updates the me.info from the current fields.
+		It should be called after the registration request.
+
+		@return	bool	-	True if file updated, false otherwise.
+	*/
 	bool UpdateMeInfo(uuid_t newUuid);
 
+	/**
+		The map which holds all the other clients' relevant data is an unordered map
+		with the name as the key.
+		Thus this funtcion helps for the otherway around when needed to get the name 
+		from a given UUID.
+
+		@param	uuid	-	The UUID of the user whose name we want.
+
+		@return	string	-	The name if succesful, empty string otherwise.
+	*/
 	std::string GetNameFromUuid(const uuid_t &uuid);
 
+	// Each of these functions implements a single option from the menu.
 	ReturnStatus HandleRegister();
 	ReturnStatus HandleList();
 	ReturnStatus HandlePublicKey();
-
 	ReturnStatus HandleWaitingMessages();
 	ReturnStatus HandleSendMessage();
-
 	ReturnStatus HandleRequestSymKey();
 	ReturnStatus HandleSendSymKey();
 
@@ -108,7 +181,7 @@ private:
 	// To keep track if the client has been refistered or not.
 	bool m_isInit;
 
-	// Connection to server
+	// Connection to server info.
 	std::string m_ipAddr;
 	uint16_t m_port;
 
@@ -117,7 +190,7 @@ private:
 
 	RSAPrivateWrapper *m_privateKey;
 
-	// Client's name, UUID and given public key
+	// Client's name, UUID and given public key.
 	Name m_name;
 	UUID m_uuid;
 };
@@ -153,7 +226,6 @@ Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, St
 	case Client::ReturnStatus::Success:
 		// Message is not failure, try to get full message.
 		if (response.Desrialize(responseVec) == false) {
-			std::cout << "Failed deserialize" << std::endl;
 			return Client::ReturnStatus::GeneralError;
 		}
 
