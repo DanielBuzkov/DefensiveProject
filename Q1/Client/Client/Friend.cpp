@@ -17,23 +17,23 @@ Friend::~Friend() {
 bool Friend::Init(const std::string name, const uuid_t uuid) {
 	
 	// Won't init twice
-	if (m_isInit == true) {
+	if (this->m_isInit == true) {
 		return false;
 	}
 	
 	// Initialize the fields which each friend MUST have.
-	if (m_name.Deserialize(name) == false ||
-		m_uuid.Deserialize((char*)uuid, sizeof(uuid_t)) == false) {
+	if (this->m_name.Deserialize(name) == false ||
+		this->m_uuid.Deserialize((char*)uuid, sizeof(uuid_t)) == false) {
 		return false;
 	}
 
-	m_isInit = true;
+	this->m_isInit = true;
 
 	return true;
 }
 
 bool Friend::IsUuidEqual(const uuid_t &otherUuid) const {
-	return m_uuid.IsEqual(otherUuid);
+	return this->m_uuid.IsEqual(otherUuid);
 }
 
 bool Friend::HasSym() {
@@ -41,16 +41,16 @@ bool Friend::HasSym() {
 }
 
 bool Friend::HasPuiblic() {
-	return m_publicKey != nullptr;
+	return this->m_publicKey != nullptr;
 }
 
 bool Friend::GetUuid(uuid_t o_uuidBuff) { 
-	return m_uuid.Serialize(o_uuidBuff, sizeof(uuid_t));
+	return this->m_uuid.Serialize(o_uuidBuff, sizeof(uuid_t));
 }
 
 std::string Friend::GetName() { 
 	uint8_t tmpNameBuffer[MAX_NAME_BUFFER_SIZE] = { 0 };
-	m_name.Serialize(tmpNameBuffer, sizeof(name_t));
+	this->m_name.Serialize(tmpNameBuffer, sizeof(name_t));
 
 	std::string ret((char*)tmpNameBuffer);
 	return ret;

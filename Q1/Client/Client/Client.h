@@ -4,7 +4,6 @@
 #include <unordered_map>
 
 #include <boost/asio.hpp>
-#include <boost/array.hpp>
 
 #include "Protocol.h"
 #include "Friend.h"
@@ -58,6 +57,11 @@ private:
 
 private:
 	/**
+		Prints the entire menu for the user.
+	*/
+	static const void PrintOption();
+
+	/**
 		The function prints the menu to the user and gets a choise from him.
 		A valid choise is guarenteed since the function won't return until
 		a valid option is entered.
@@ -67,12 +71,7 @@ private:
 
 		@return MenuOptions	-	The coresposing enumerate to keep handling the request.
 	*/
-	MenuOptions GetMenuChoise();
-
-	/**
-		Prints the entire menu for the user.
-	*/
-	static void PrintOption();
+	const MenuOptions GetMenuChoise();
 
 	/**
 		The function parses the 'server.info' file by the format:
@@ -91,6 +90,14 @@ private:
 	bool ParseMeInfo();
 
 	/**
+		This function updates the me.info from the current fields.
+		It should be called after the registration request.
+
+		@return	bool	-	True if file updated, false otherwise.
+	*/
+	bool UpdateMeInfo(uuid_t newUuid);
+
+	/**
 		A template function for sending a request and receiving a response from the server.
 		At this implementation the request and the response are pre-defined at compile time.
 
@@ -102,7 +109,7 @@ private:
 								-	GeneralError otherwise.
 	*/
 	template<Opcode _reqCode, typename ReqBody, Opcode _resCode, typename ResBody>
-	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response);
+	const ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response);
 
 	/**
 		A template function for sending a request and receiving a response with unknown length from the server.
@@ -117,7 +124,7 @@ private:
 								-	GeneralError otherwise.
 	*/
 	template<Opcode _reqCode, typename ReqBody>
-	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, std::vector<uint8_t>& responseVec);
+	const ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, std::vector<uint8_t>& responseVec);
 
 	/**
 		A template function for sending a request of unknown length and receiving a response from the server.
@@ -132,7 +139,7 @@ private:
 								-	GeneralError otherwise.
 	*/
 	template<Opcode _resCode, typename ResBody>
-	ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, StaticResponse<_resCode, ResBody>& response);
+	const ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, StaticResponse<_resCode, ResBody>& response);
 
 	/**
 		A template function for sending a request of unknown length and receiving a response 
@@ -146,15 +153,7 @@ private:
 								-	Success if the request has been handled successfuly.
 								-	GeneralError otherwise.
 	*/
-	ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec);
-
-	/**
-		This function updates the me.info from the current fields.
-		It should be called after the registration request.
-
-		@return	bool	-	True if file updated, false otherwise.
-	*/
-	bool UpdateMeInfo(uuid_t newUuid);
+	const ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec);
 
 	/**
 		The map which holds all the other clients' relevant data is an unordered map
@@ -168,7 +167,14 @@ private:
 	*/
 	std::string GetNameFromUuid(const uuid_t &uuid);
 
-	// Each of these functions implements a single option from the menu.
+	/*
+		Each of these functions implements a single option from the menu.
+		Each of them returns Client::ReturnStatus :
+			
+			Client::ReturnStatus::Success		-	Successfuly handled.
+			Client::ReturnStatus::ServerError	-	Received the error response from the server (Opcode::ResponseFailure).
+			Client::ReturnStatus::GeneralError	-	Some error accured while sending or receiving.
+	*/
 	ReturnStatus HandleRegister();
 	ReturnStatus HandleList();
 	ReturnStatus HandlePublicKey();
@@ -196,7 +202,7 @@ private:
 };
 
 template<Opcode _reqCode, typename ReqBody, Opcode _resCode, typename ResBody>
-Client::ReturnStatus Client ::Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response) {
+const Client::ReturnStatus Client ::Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response) {
 	std::vector<uint8_t> requestVec;
 	request.Serialize(requestVec);
 
@@ -204,7 +210,7 @@ Client::ReturnStatus Client ::Exchange(const StaticRequest<_reqCode, ReqBody> re
 }
 
 template<Opcode _reqCode, typename ReqBody>
-Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> request, std::vector<uint8_t>& responseVec) {
+const Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> request, std::vector<uint8_t>& responseVec) {
 	std::vector<uint8_t> requestVec;
 	request.Serialize(requestVec);
 
@@ -212,7 +218,7 @@ Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> req
 }
 
 template<Opcode _resCode, typename ResBody>
-Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, StaticResponse<_resCode, ResBody>& response) {
+const Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, StaticResponse<_resCode, ResBody>& response) {
 
 	std::vector<uint8_t> responseVec;
 

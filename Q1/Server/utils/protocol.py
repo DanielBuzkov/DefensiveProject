@@ -156,6 +156,10 @@ class SendMessageReqBody:
         self.content = bytestream[21:]
         self.raw = bytestream
 
+    def update(self):
+        self.raw = struct.pack(self.format, self.client_id, self.message_type, self.content_size)
+        self.raw += self.content
+
     @staticmethod
     def get_sub_header_size():
         return UUID_LEN + 1 + 4

@@ -1,9 +1,7 @@
 #include "Client.h"
+
 #include <iostream>
 #include <fstream>
-#include <string>
-
-#include <boost/asio.hpp>
 
 #include "SystemUtils.h"
 
@@ -15,19 +13,17 @@ static constexpr size_t MAX_IP_STR_LENGTH = (4 * 3) + 3;
 static constexpr size_t MIN_IP_STR_LENGTH = (4 * 1) + 3;
 
 // At most 2**16 which is 5 digits long.
-static constexpr size_t MAX_PORT_STR_LENGTH = 5;
+static constexpr size_t MAX_PORT_STR_LENGTH = 5; 
 static constexpr size_t MIN_PORT_STR_LENGTH = 1;
-
-static constexpr size_t MAX_MESSAGE_LENGTH = 8192;
 
 Client::Client() : m_isInit(false), m_port(0), m_privateKey(nullptr) {}
 
 Client::~Client() {
-	if (m_privateKey != nullptr) {
-		delete m_privateKey;
+	if (this->m_privateKey != nullptr) {
+		delete this->m_privateKey;
 	}
 
-	for (auto& currTuple : m_data) {
+	for (auto& currTuple : this->m_data) {
 		delete currTuple.second;
 	}
 }
@@ -47,7 +43,7 @@ bool Client::Init() {
 		// At that stage all the file's content is available and both the server
 		// and the client are aware of him being registered.
 
-		m_isInit = false;
+		this->m_isInit = false;
 		return true;
 	}
 
@@ -55,7 +51,7 @@ bool Client::Init() {
 		return false;
 	}
 
-	m_isInit = true;
+	this->m_isInit = true;
 	return true;
 }
 
@@ -116,7 +112,7 @@ void Client::Run(){
 
 //-------------------------------------------- UTILITIES --------------------------------------------
 
-void Client::PrintOption() {
+void const Client::PrintOption() {
 	std::cout << "10) Register" << std::endl;
 	std::cout << "20) Request for client list" << std::endl;
 	std::cout << "30) Request for public key" << std::endl;
@@ -127,7 +123,7 @@ void Client::PrintOption() {
 	std::cout << " 0) Exit client" << std::endl;
 }
 
-Client::MenuOptions Client::GetMenuChoise() {
+const Client::MenuOptions Client::GetMenuChoise() {
 
 	uint16_t userInput = 0;
 
@@ -135,8 +131,11 @@ Client::MenuOptions Client::GetMenuChoise() {
 	std::cout << "MessageU client at your service." << std::endl;
 
 	while(true) {
+		// Clearing out the input.
+		userInput = 0;
+
 		PrintOption();
-		std::cin >> userInput; //*!
+		std::cin >> userInput; 
 
 		// Handling failed input and clearing the error flag and buffer.
 		if (std::cin.fail()) {
@@ -162,14 +161,14 @@ Client::MenuOptions Client::GetMenuChoise() {
 		}
 
 		// Making sure the user has made a choise which is available for his state.
-		if (m_isInit == false &&
+		if (this->m_isInit == false &&
 			userInput != (uint16_t)Client::MenuOptions::Register &&
 			userInput != (uint16_t)Client::MenuOptions::Exit) {
 			std::cout << "Must register before making this action." << std::endl;
 			continue;
 		}
 
-		if (m_isInit == true &&
+		if (this->m_isInit == true &&
 			userInput == (uint16_t)Client::MenuOptions::Register) {
 			std::cout << "Unable to register again" << std::endl;
 			continue;
@@ -188,9 +187,11 @@ bool Client::ParseServerInfo() {
 		return false;
 	}
 
+	// Holding the size of the file's content, since we know how long
+	// the content shall be.
 	auto fileSize = SystemUtils::GetFileSize(SERVER_INFO_PATH);
 
-	// Adding one for the semicolon
+	// Adding one for the semicolon ('IP:PORT' structure)
 	if (fileSize < (MIN_PORT_STR_LENGTH) + (MIN_IP_STR_LENGTH) + 1 ||
 		fileSize > (MAX_PORT_STR_LENGTH) + (MAX_IP_STR_LENGTH) + 1) {
 		std::cout << "Invalid file content length" << std::endl;
@@ -216,9 +217,11 @@ bool Client::ParseServerInfo() {
 	// The file is not needed anymore.
 	infoFile.close();
 
+	// A temporary 64 bit number to hold the port for validations.
 	uint64_t tmp = 0;
 	size_t delimiterIndex = line.find(':');
 
+	// Make sure the semicolon is found.
 	if (delimiterIndex == std::string::npos ||
 		line.length() < fileSize) {
 		std::cout << "Invalid file format" << std::endl;
@@ -227,8 +230,8 @@ bool Client::ParseServerInfo() {
 
 	// Trying to cast the values read from the file in case 'stoi' fails or more.
 	try {
-		m_ipAddr = line.substr(0, delimiterIndex);
-		boost::asio::ip::address::from_string(m_ipAddr);
+		this->m_ipAddr = line.substr(0, delimiterIndex);
+		boost::asio::ip::address::from_string(this->m_ipAddr);
 
 		tmp = stoi(line.substr(delimiterIndex + 1));
 	}
@@ -248,7 +251,7 @@ bool Client::ParseServerInfo() {
 		return false;
 	}
 
-	m_port = (uint16_t)tmp;
+	this->m_port = (uint16_t)tmp;
 
 	return true;
 }
@@ -261,7 +264,7 @@ bool Client::ParseMeInfo() {
 	std::string inputPrivateKey;
 	std::string temp;
 
-	if (m_isInit == true) {
+	if (this->m_isInit == true) {
 		std::cout << "User is already init" << std::endl;
 		return false;
 	}
@@ -273,6 +276,7 @@ bool Client::ParseMeInfo() {
 		return false;
 	}
 
+	// Reading exactly three lines, as difined.
 	if (!std::getline(infoFile, inputName)) {
 		std::cout << "Failed reading name from " << ME_INFO_PATH << std::endl;
 		infoFile.close();
@@ -291,6 +295,7 @@ bool Client::ParseMeInfo() {
 		return false;
 	}
 
+	// Any other line is a violation of the accepted file's structure.
 	if (std::getline(infoFile, temp)) {
 		std::cout << "Invalid file format" << std::endl;
 		infoFile.close();
@@ -300,59 +305,63 @@ bool Client::ParseMeInfo() {
 	// The file is not needed anymore.
 	infoFile.close();
 
-	if (m_name.Deserialize(inputName) == false ||
-		m_uuid.FromFile(inputUuid) == false) {
+	// Validating the name and the UUID read from the file.
+	if (this->m_name.Deserialize(inputName) == false ||
+		this->m_uuid.FromFile(inputUuid) == false) {
 		std::cout << "Failed reading UUID or name" << std::endl;
 		return false;
 	}
 
+	// Validating the private key.
 	try {
-		// This badly decomanted function will throw an exception upon invalid key.
-		m_privateKey = new RSAPrivateWrapper(Base64Wrapper::decode(inputPrivateKey));
+		this->m_privateKey = new RSAPrivateWrapper(Base64Wrapper::decode(inputPrivateKey));
 	}
 	catch (const std::exception&) {
 		std::cout << "Invalid key" << std::endl;
 		return false;
 	}
 
-	m_isInit = true;
+	// Updating only after succesfully initializing through the file.
+	this->m_isInit = true;
 
 	return true;
 }
 
 bool Client::UpdateMeInfo(uuid_t newUuid) {
 	
-	if (m_isInit == true) {
+	if (this->m_isInit == true) {
 		std::cout << "User is already init" << std::endl;
 		return false;
 	}
 
 	// Making sure the given UUID is valid and updating the field.
-	if (m_uuid.Deserialize((const char*)newUuid, sizeof(uuid_t)) == false) {
+	if (this->m_uuid.Deserialize((const char*)newUuid, sizeof(uuid_t)) == false) {
 		std::cout << "Invalid UUID" << std::endl;
 		return false;
 	}
 
+	// Building UUID line.
 	std::string uuidString;
-	
-	if (m_uuid.ToFile(uuidString) == false) {
+	if (this->m_uuid.ToFile(uuidString) == false) {
 		std::cout << "Unable to get UUID" << std::endl;
 		return false;
 	}
 
+	// Building name line.
 	name_t nameBuffer = { 0 };
-
-	if (m_name.Serialize(nameBuffer, sizeof(nameBuffer)) == false) {
+	if (this->m_name.Serialize(nameBuffer, sizeof(nameBuffer)) == false) {
 		std::cout << "Failed updating file" << std::endl;
 		return false;
 	}
 
 	// Remove newlines from string.
-	std::string encodedPrivateKey = Base64Wrapper::encode(m_privateKey->getPrivateKey());
+	std::string encodedPrivateKey = Base64Wrapper::encode(this->m_privateKey->getPrivateKey());
 	encodedPrivateKey.erase(std::remove(encodedPrivateKey.begin(), encodedPrivateKey.end(), '\n'), encodedPrivateKey.end());
 
-	m_isInit = true;
+	// Updated all relevant fields, so the instance is initialized.
+	this->m_isInit = true;
 
+	// Writing all parsed data to the file.
 	std::ofstream infoFile(ME_INFO_PATH);
 
 	infoFile << nameBuffer << std::endl;
@@ -365,7 +374,7 @@ bool Client::UpdateMeInfo(uuid_t newUuid) {
 }
 
 std::string Client::GetNameFromUuid(const uuid_t &uuid) {
-	for (const auto& currTuple : m_data) {
+	for (const auto& currTuple : this->m_data) {
 		Friend* currFirend = currTuple.second;
 
 		if (currFirend->IsUuidEqual(uuid) == true) {
@@ -380,7 +389,7 @@ std::string Client::GetNameFromUuid(const uuid_t &uuid) {
 Client::ReturnStatus Client::HandleRegister() {
 	
 	// Making sure a registered user is not registering again.
-	if (m_isInit == true) {
+	if (this->m_isInit == true) {
 		std::cout << "Error: Client is already registered." << std::endl;
 		return Client::ReturnStatus::GeneralError;
 	}
@@ -390,7 +399,7 @@ Client::ReturnStatus Client::HandleRegister() {
 	std::cout << "Insert your name: ";
 	std::cin >> name;
 
-	if (m_name.Deserialize(name) == false) {
+	if (this->m_name.Deserialize(name) == false) {
 		std::cout << "Invalid name. Name should contain only alphabetic charecters." << std::endl;
 		return ReturnStatus::GeneralError;
 	}
@@ -398,15 +407,15 @@ Client::ReturnStatus Client::HandleRegister() {
 	RequestRegister request;
 	ResponseRegister response;
 
-	if (m_name.Serialize(request.body.name, sizeof(request.body.name)) == false) {
+	if (this->m_name.Serialize(request.body.name, sizeof(request.body.name)) == false) {
 		std::cout << "Failed serializing name to message" << std::endl;
-		m_name.Reset();
+		this->m_name.Reset();
 		return ReturnStatus::GeneralError;
 	}
 
 	// Generating the key pair for RSA
-	m_privateKey = new RSAPrivateWrapper();
-	m_privateKey->getPublicKey((char*)request.body.publicKey, sizeof(request.body.publicKey));
+	this->m_privateKey = new RSAPrivateWrapper();
+	this->m_privateKey->getPublicKey((char*)request.body.publicKey, sizeof(request.body.publicKey));
 
 	// Sending request and waiting for response.
 	ReturnStatus ret = Exchange(request, response);
@@ -415,30 +424,30 @@ Client::ReturnStatus Client::HandleRegister() {
 		// Update me.info with all new values.
 		if (UpdateMeInfo(response.body.uuid) == false) {
 			// Making sure no traces left after failure.
-			delete m_privateKey;
-			m_privateKey = nullptr;
+			delete this->m_privateKey;
+			this->m_privateKey = nullptr;
 
-			m_name.Reset();
+			this->m_name.Reset();
 
 			std::cout << "Failed updating UUID from server" << std::endl;
 			return ReturnStatus::GeneralError;
 		}
 
-		m_isInit = true;
+		this->m_isInit = true;
 	}
 	else {
 		// Making sure no traces left after failure.
-		delete m_privateKey;
-		m_privateKey = nullptr;
+		delete this->m_privateKey;
+		this->m_privateKey = nullptr;
 
-		m_name.Reset();
+		this->m_name.Reset();
 	}
 
 	return ret;
 }
 
 Client::ReturnStatus Client::HandleList() {
-	RequestList request(m_uuid);
+	RequestList request(this->m_uuid);
 	std::vector<uint8_t> responseVec;
 
 	// Sending request and waiting for response.
@@ -459,13 +468,16 @@ Client::ReturnStatus Client::HandleList() {
 	for (auto i = 0; i < numerOfNodes; i++) {
 		ResponseUsersListNode currNode;
 
-		memcpy(&currNode, responseVec.data() + sizeof(BaseResponseHeader) + (i * ResponseUsersListNode::GetSize()), ResponseUsersListNode::GetSize());
-		std::string currName((char*)currNode.name);
+		// Iterating over the buffer by the pre-defined format.
+		memcpy(&currNode, 
+			responseVec.data() + sizeof(BaseResponseHeader) + (i * ResponseUsersListNode::GetSize()), 
+			ResponseUsersListNode::GetSize());
 
+		std::string currName((char*)currNode.name);
 		std::cout << currName << std::endl;
 
 		// No need handling this friend, since names are also unique.
-		if (m_data.find(currName) != m_data.end()) {
+		if (this->m_data.find(currName) != this->m_data.end()) {
 			continue;
 		}
 
@@ -478,14 +490,15 @@ Client::ReturnStatus Client::HandleList() {
 			continue;
 		}
 
-		m_data[currName] = currFriend;
+		// Adding the new client to the map.
+		this->m_data[currName] = currFriend;
 	}
 	
 	return Client::ReturnStatus::Success;
 }
 
 Client::ReturnStatus Client::HandlePublicKey() {
-	RequestPK request(m_uuid);
+	RequestPK request(this->m_uuid);
 	ResponsePK response;
 	
 	std::string name;
@@ -493,21 +506,22 @@ Client::ReturnStatus Client::HandlePublicKey() {
 	std::cout << "Insert destenation name: ";
 	std::cin >> name;
 
-	if (m_data.find(name) == m_data.end()) {
+	// Making sure the client exists, so a matching UUID can be extracted.
+	if (this->m_data.find(name) == this->m_data.end()) {
 		std::cout << "Name not found" << std::endl;
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	if (m_data[name]->GetUuid(request.body.uuid) == false) {
-
+	if (this->m_data[name]->GetUuid(request.body.uuid) != true) {
 		std::cout << "Failed getting UUID for user" << std::endl;
 		return Client::ReturnStatus::GeneralError;
 	}
 
 	ReturnStatus ret = Exchange(request, response);
 
+	// Updating the local client's public key for future use.
 	if (ret == ReturnStatus::Success) {
-		m_data[name]->SetPublicKey(response.body.publicKey);
+		this->m_data[name]->SetPublicKey(response.body.publicKey);
 	}
 
 	return ret;
@@ -515,7 +529,7 @@ Client::ReturnStatus Client::HandlePublicKey() {
 
 Client::ReturnStatus Client::HandleWaitingMessages() {
 
-	RequestGetMessages request(m_uuid);
+	RequestGetMessages request(this->m_uuid);
 	std::vector<uint8_t> responseVec;
 
 	// Sending request and waiting for response.
@@ -550,11 +564,22 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 		bytesLeft -= MessageHeader::GetSize();
 		bytesRead += MessageHeader::GetSize();
 
+		for (auto i = 0; i < 16; i++) {
+			if (i > 0 && i % 8 == 0) {
+				printf("\n");
+			}
+
+			printf("0x%02x, ", currHeader.uuid[i]);
+		}
+
+		printf("\n\n");
+
+
 		// Get friend name from UUID
 		std::string clientName = GetNameFromUuid(currHeader.uuid);
 
 		if (clientName == "" ||
-			m_data.find(clientName) == m_data.end()) {
+			this->m_data.find(clientName) == this->m_data.end()) {
 			std::cout << "Failed getting client's name" << std::endl;
 			return Client::ReturnStatus::GeneralError;
 		}
@@ -572,8 +597,20 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 		case MessageType::SendSymKey: {
 			std::vector<uint8_t> content(consume.begin() + MessageHeader::GetSize(), consume.end());
 
-			std::string symKey = m_privateKey->decrypt((char*)content.data(), 128);
-			m_data[clientName]->SetSymKey((unsigned char*)symKey.c_str(), symKey.size());
+			if (content.size() < ENCRYPTED_SYM_KEY_LENGTH) {
+				std::cout << "Invalid sym key content" << std::endl;
+				return Client::ReturnStatus::GeneralError;
+			}
+
+			try {
+				// Decrypting only as long as needed.
+				std::string symKey = this->m_privateKey->decrypt((char*)content.data(), ENCRYPTED_SYM_KEY_LENGTH);
+				this->m_data[clientName]->SetSymKey((unsigned char*)symKey.c_str(), symKey.size());
+			}
+			catch (...) {
+				std::cout << "Failed getting symetric key" << std::endl;
+				return Client::ReturnStatus::GeneralError;
+			}
 
 			std::cout << "symmetric key received";
 			break;
@@ -582,13 +619,14 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 		case MessageType::SendText: {
 			std::vector<uint8_t> content(consume.begin() + MessageHeader::GetSize(), consume.end());
 			
-			std::string plain = m_data[clientName]->GetSymKey()->decrypt((char*)content.data(), currHeader.contentSize);
+			std::string plain = this->m_data[clientName]->GetSymKey()->decrypt((char*)content.data(), currHeader.contentSize);
 			
 			std::cout << plain;
 			break;
 		}
 
 		default:
+			std::cout << "Unrecognized message type";
 			break;
 		}
 
@@ -617,7 +655,8 @@ Client::ReturnStatus Client::HandleSendMessage() {
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	if (m_data.find(name) == m_data.end()) {
+	// Won't be handling clients who's UUID can not be extracted.
+	if (this->m_data.find(name) == this->m_data.end()) {
 		std::cout << "Username not found" << std::endl;
 		return Client::ReturnStatus::GeneralError;
 	}
@@ -632,27 +671,39 @@ Client::ReturnStatus Client::HandleSendMessage() {
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	if (m_data[name]->HasSym() != true) {
+	// Making sure a message can even be encrypted.
+	if (this->m_data[name]->HasSym() != true) {
 		std::cout << "Friend has no sym key set" << std::endl;
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	std::string cipher = m_data[name]->GetSymKey()->encrypt(message.c_str(), message.size());
-	std::vector<uint8_t> vec(cipher.begin(), cipher.end());
+	// The vector which will hold the request body's inner body.
+	std::vector<uint8_t> requestContent;
 
-	DynamicRequest request(m_uuid, (uint16_t)Opcode::RequestSendMessage, vec);
+	// Building message header with UUID and encrypted data.
+	uuid_t friendUUid;
+	this->m_data[name]->GetUuid(friendUUid);
+
+	std::string cipher = this->m_data[name]->GetSymKey()->encrypt(message.c_str(), message.size());
+
+	MessageHeader header(friendUUid, (uint8_t)MessageType::SendText, cipher.size());
+	
+	// Building the request body.
+	header.Serialize(requestContent);
+	requestContent.insert(requestContent.end(), cipher.begin(), cipher.end());
+	
+	// Encapsulating the body with a request header.
+	DynamicRequest request(this->m_uuid, (uint16_t)Opcode::RequestSendMessage, requestContent);
 
 	std::vector<uint8_t> requestBuff;
 	request.Serialize(requestBuff);
-
-	std::cout << "about to send " << requestBuff.size() << " bytes!" << std::endl;
 
 	return Exchange(requestBuff, response);
 }
 
 Client::ReturnStatus Client::HandleRequestSymKey() {
 
-	RequestGetSymKey request(m_uuid);
+	RequestGetSymKey request(this->m_uuid);
 	ResponseSendMessage response;
 
 	std::string name;
@@ -660,12 +711,13 @@ Client::ReturnStatus Client::HandleRequestSymKey() {
 	std::cout << "Insert destenation name: ";
 	std::cin >> name;
 
-	if (m_data.find(name) == m_data.end()) {
+	// Won't request sym key from client who's UUID can not be extracted.
+	if (this->m_data.find(name) == this->m_data.end()) {
 		std::cout << "Username not found" << std::endl;
 		return Client::ReturnStatus::GeneralError;
 	}
 	
-	if (m_data[name]->GetUuid(request.body.messageHeader.uuid) == false) {
+	if (this->m_data[name]->GetUuid(request.body.messageHeader.uuid) == false) {
 
 		std::cout << "Failed getting UUID for user" << std::endl;
 		return Client::ReturnStatus::GeneralError;
@@ -674,9 +726,9 @@ Client::ReturnStatus Client::HandleRequestSymKey() {
 	return Exchange(request, response);
 }
 
-Client::ReturnStatus Client::HandleSendSymKey() {
+Client::ReturnStatus Client::HandleSendSymKey(){
 
-	RequestSendSymKey request(m_uuid);
+	RequestSendSymKey request(this->m_uuid);
 	ResponseSendMessage response;
 
 	std::string name;
@@ -684,31 +736,31 @@ Client::ReturnStatus Client::HandleSendSymKey() {
 	std::cout << "Insert destenation name: ";
 	std::cin >> name;
 
-	if (m_data.find(name) == m_data.end()) {
+	if (this->m_data.find(name) == this->m_data.end()) {
 		std::cout << "Username not found" << std::endl;
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	if (m_data[name]->GetUuid(request.body.messageHeader.uuid) != true) {
+	if (this->m_data[name]->GetUuid(request.body.messageHeader.uuid) != true) {
 		std::cout << "Failed getting UUID for user" << std::endl;
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	if (m_data[name]->HasPuiblic() != true) {
+	if (this->m_data[name]->HasPuiblic() != true) {
 		std::cout << "Ask for public key first!" << std::endl;
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	AESWrapper* symKey = m_data[name]->GetSymKey();
+	AESWrapper* symKey = this->m_data[name]->GetSymKey();
 	memcpy((char*)&request.body.content, symKey->getKey(), 16);
 
-	std::string cipher = m_data[name]->GetPublicKey()->encrypt((char*)&request.body.content, 16);
+	std::string cipher = this->m_data[name]->GetPublicKey()->encrypt((char*)&request.body.content, 16);
 	memcpy((char*)&request.body.content, cipher.c_str(), request.body.messageHeader.contentSize);
 
 	return Exchange(request, response);
 }
 
-Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec) {
+const Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec) {
 
 	BaseResponseHeader tempHeader;
 	responseVec.clear();
@@ -717,18 +769,20 @@ Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, st
 		boost::asio::io_context io_context;
 		boost::asio::ip::tcp::socket socket(io_context);
 
-		boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(m_ipAddr), m_port);
+		boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(this->m_ipAddr), this->m_port);
 
 		socket.connect(endpoint);
 
+		// Sending the request.
 		boost::asio::write(socket, boost::asio::buffer(requestVec.data(), requestVec.size()));
 
 		// Reading header.
 		boost::asio::streambuf header;
 		boost::asio::read(socket, header, boost::asio::transfer_exactly(sizeof(tempHeader)));
 		
-		const unsigned char* header_data = boost::asio::buffer_cast<const unsigned char*>(header.data());
-		responseVec.insert(responseVec.end(), header_data, header_data + sizeof(tempHeader));
+		responseVec.insert(responseVec.end(),
+							boost::asio::buffer_cast<const unsigned char*>(header.data()),
+							boost::asio::buffer_cast<const unsigned char*>(header.data()) + sizeof(tempHeader));
 
 		if (tempHeader.Deserialize(responseVec) != true) {
 			throw std::runtime_error("Failed deserialize");
@@ -737,9 +791,10 @@ Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, st
 		// Reading payload.
 		boost::asio::streambuf payload;
 		boost::asio::read(socket, payload, boost::asio::transfer_exactly(tempHeader.GetPayloadSize()));
-
-		const unsigned char* payload_data = boost::asio::buffer_cast<const unsigned char*>(payload.data());
-		responseVec.insert(responseVec.end(), payload_data, payload_data + tempHeader.GetPayloadSize());
+		
+		responseVec.insert(responseVec.end(),
+							boost::asio::buffer_cast<const unsigned char*>(payload.data()), 
+							boost::asio::buffer_cast<const unsigned char*>(payload.data()) + tempHeader.GetPayloadSize());
 		
 		socket.close();
 	}

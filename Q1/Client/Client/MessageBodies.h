@@ -11,8 +11,7 @@
 enum class MessageType : uint8_t {
 	GetSymKey = 1,
 	SendSymKey = 2,
-	SendText = 3,
-	SendFile = 4
+	SendText = 3
 };
 
 #pragma pack(push, 1)
@@ -48,26 +47,21 @@ typedef struct _EmptyMessage {
 } EmptyMessage;
 
 // Type 2
-typedef struct s {
-	uint8_t encSymKey[128];
+typedef struct _SendSymKeyMessage {
+	uint8_t encSymKey[ENCRYPTED_SYM_KEY_LENGTH];
 
 	static constexpr size_t GetSize() {
 		return sizeof(encSymKey);
 	}
 } SendSymKeyMessage;
 
-typedef struct _SendTextMessage {
-	std::vector<uint8_t> data;
-
-	size_t GetSize() {
-		return data.size();
-	}
-} SendTextMessage;
-
 class MessageHeader {
 public:
 	MessageHeader() : uuid{ 0 }, messageType(0), contentSize(0) { };
 	MessageHeader(uint8_t type, uint32_t size) : uuid{ 0 }, messageType(type), contentSize(size) {};
+	MessageHeader(uuid_t uuid, uint8_t type, uint32_t size) : messageType(type), contentSize(size) {
+		memcpy(this->uuid, uuid, sizeof(uuid_t));
+	};
 
 	static constexpr size_t GetSize() {
 		return sizeof(uuid) + sizeof(messageType) + sizeof(contentSize);
@@ -108,9 +102,6 @@ public:
 		case (uint8_t)MessageType::SendText:
 			break;
 
-		case (uint8_t)MessageType::SendFile:
-			break;
-
 		default:
 			memset(uuid, 0, sizeof(uuid));
 			messageType = 0;
@@ -120,6 +111,13 @@ public:
 		}
 
 		return true;
+	}
+
+	const void Serialize(std::vector<uint8_t>& o_vector) const {
+		o_vector.clear();
+		o_vector.resize(MessageHeader::GetSize());
+
+		memcpy(&o_vector[0], this, MessageHeader::GetSize());
 	}
 
 	MessageType GetMessageType() {
@@ -197,14 +195,5 @@ typedef struct _ResponseSendMessageBody {
 	}
 
 } ResponseSendMessageBody;
-
-// Opcode 2004
-/*typedef struct {
-	uuid_t uuid;
-	uint32_t messageId;
-	uint8_t messageType;
-	uint32_t messageSize;
-	//content itself
-} ;*/
 
 #pragma pack(pop)

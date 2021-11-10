@@ -16,12 +16,12 @@ bool Name::Deserialize(const std::string data) {
 	
 	// Invalid size for given data.
 	// Make sure to leave the '>=' to leave space fot the null terminator.
-	if (data.length() >= sizeof(m_data)) {
+	if (data.length() >= sizeof(this->m_data)) {
 		return false;
 	}
 	
 	// Won't allow rewrite existing data.
-	if (m_isInit == true) {
+	if (this->m_isInit == true) {
 		return false;
 	}
 
@@ -34,12 +34,12 @@ bool Name::Deserialize(const std::string data) {
 		}
 	}
 
-	memcpy(m_data, data.c_str(), data.length());
+	memcpy(this->m_data, data.c_str(), data.length());
 	
 	// m_data is already set as zeros, but to make sure.
-	m_data[data.length()] = 0;
+	this->m_data[data.length()] = 0;
 
-	m_isInit = true;
+	this->m_isInit = true;
 
 	return true;
 }
@@ -48,35 +48,35 @@ bool Name::Serialize(uint8_t* buffer, const size_t buffSize) const {
 
 	// Invalid size for given data.
 	// Allowing only the exact size for buffers.
-	if (buffSize != sizeof(m_data)) {
+	if (buffSize != sizeof(this->m_data)) {
 		return false;
 	}
 
 	// Unable to copy data, since the instance has no data.
-	if (m_isInit != true) {
+	if (this->m_isInit != true) {
 		return false;
 	}
 
 	memset(buffer, 0, buffSize);
-	memcpy(buffer, m_data, buffSize);
+	memcpy(buffer, this->m_data, buffSize);
 
 	return true;
 }
 
 void Name::Reset() {
-	m_isInit = false;
-	memset(m_data, 0, sizeof(m_data));
+	this->m_isInit = false;
+	memset(this->m_data, 0, sizeof(this->m_data));
 }
 
 bool UUID::FromFile(const std::string data) {
 
 	// Invalid size for given data.
-	if (data.length() != CHARS_PER_BYTE * sizeof(m_data)) {
+	if (data.length() != CHARS_PER_BYTE * sizeof(this->m_data)) {
 		return false;
 	}
 
 	// Won't allow rewrite existing data.
-	if (m_isInit == true) {
+	if (this->m_isInit == true) {
 		return false;
 	}
 
@@ -88,7 +88,7 @@ bool UUID::FromFile(const std::string data) {
 	}
 
 	// Converting each to charecters to a single value in m_data.
-	for (size_t i = 0; i < sizeof(m_data); i++) {
+	for (size_t i = 0; i < sizeof(this->m_data); i++) {
 		long temp = std::stoul(data.substr(CHARS_PER_BYTE * i, CHARS_PER_BYTE), nullptr, HEX_BASE);
 
 		// Should not happen, since the substring is only two characters long.
@@ -96,10 +96,10 @@ bool UUID::FromFile(const std::string data) {
 			return false;
 		}
 
-		m_data[i] = (uint8_t)temp;
+		this->m_data[i] = (uint8_t)temp;
 	}
 
-	m_isInit = true;
+	this->m_isInit = true;
 
 	return true;
 }
@@ -107,16 +107,16 @@ bool UUID::FromFile(const std::string data) {
 bool UUID::ToFile(std::string &o_string) const {
 
 	// Unable to copy data, since the instance has no data.
-	if (m_isInit != true) {
+	if (this->m_isInit != true) {
 		return false;
 	}
 
 	const char* digits = "0123456789abcdef";
 
 	// Converting each to charecters to a single value in m_data.
-	for (size_t i = 0; i < sizeof(m_data) ; i++) {
-		auto high = (m_data[i] >> NIBBLE_LEN_IN_BITS) & LOW_NIBBLE;
-		auto low = m_data[i] & LOW_NIBBLE;
+	for (size_t i = 0; i < sizeof(this->m_data) ; i++) {
+		auto high = (this->m_data[i] >> NIBBLE_LEN_IN_BITS) & LOW_NIBBLE;
+		auto low = this->m_data[i] & LOW_NIBBLE;
 
 		o_string += digits[high];
 		o_string += digits[low];
@@ -132,12 +132,12 @@ bool UUID::Deserialize(const char* buffer, const size_t buffLen) {
 	}
 
 	// Now allowing rewriting the current data.
-	if (m_isInit == true) {
+	if (this->m_isInit == true) {
 		return false;
 	}
 
-	memcpy(m_data, buffer, buffLen);
-	m_isInit = true;
+	memcpy(this->m_data, buffer, buffLen);
+	this->m_isInit = true;
 
 	return true;
 }
@@ -149,16 +149,16 @@ bool UUID::Serialize(uint8_t* buffer, const size_t buffLen) const{
 	}
 
 	// Making sure that the instace is initalized.
-	if (m_isInit != true) {
+	if (this->m_isInit != true) {
 		return false;
 	}
 
 	memset(buffer, 0, buffLen);
-	memcpy(buffer, m_data, sizeof(m_data));
+	memcpy(buffer, this->m_data, sizeof(this->m_data));
 
 	return true;
 }
 
 const bool UUID::IsEqual(const uuid_t& otherUuid) const {
-	return memcmp(m_data, otherUuid, sizeof(uuid_t)) == 0;
+	return memcmp(this->m_data, otherUuid, sizeof(uuid_t)) == 0;
 }

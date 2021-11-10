@@ -98,11 +98,13 @@ class ClientHandler:
 
         return response.raw
 
-    def handle_user_list(self):
+    def handle_user_list(self, client_uuid):
         # This handler doesn't need body data, thus no parsing is needed.
         send_buffer = bytes()
 
         for uuid in self.users:
+            if uuid == UUID(bytes=client_uuid):
+                continue
             send_buffer += UserListResNode(uuid, self.get_name_from_uuid(uuid)).raw
 
         return send_buffer
@@ -137,6 +139,8 @@ class ClientHandler:
         # Switching id's, so the message itself will contain the sender's id
         dest_id = body.client_id
         body.client_id = uuid
+
+        body.update()
 
         self.push_message(UUID(bytes=dest_id), body)
 
@@ -187,7 +191,7 @@ class ClientHandler:
                 response_opcode = Opcodes.RegisterRes
 
             elif header.code == Opcodes.UserListReq:
-                response_body = self.handle_user_list()
+                response_body = self.handle_user_list(header.client_id)
                 response_opcode = Opcodes.UserListRes
 
             elif header.code == Opcodes.GetPKReq:
@@ -211,6 +215,7 @@ class ClientHandler:
                 self.send_error(client_socket)
                 print("Handling failed")
             else:
+                print("All good in the hood")
                 response_header = ResponseHeader(code=response_opcode, payload_size=len(response_body))
                 client_socket.send(response_header.raw + bytes(response_body))
 
