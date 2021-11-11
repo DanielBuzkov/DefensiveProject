@@ -3,14 +3,14 @@
 Friend::Friend() : m_isInit(false), m_publicKey(nullptr), m_symkey(nullptr) {}
 
 Friend::~Friend() {
-	if (m_publicKey) {
-		delete m_publicKey;
-		m_publicKey = nullptr;
+	if (this->m_publicKey) {
+		delete this->m_publicKey;
+		this->m_publicKey = nullptr;
 	}
 
-	if (m_symkey) {
-		delete m_symkey;
-		m_symkey = nullptr;
+	if (this->m_symkey) {
+		delete this->m_symkey;
+		this->m_symkey = nullptr;
 	}
 }
 
@@ -32,15 +32,15 @@ bool Friend::Init(const std::string name, const uuid_t uuid) {
 	return true;
 }
 
+bool Friend::HasSym() const {
+	return this->m_symkey != nullptr;
+}
+
 bool Friend::IsUuidEqual(const uuid_t &otherUuid) const {
 	return this->m_uuid.IsEqual(otherUuid);
 }
 
-bool Friend::HasSym() {
-	return m_symkey != nullptr;
-}
-
-bool Friend::HasPuiblic() {
+bool Friend::HasPublic() const {
 	return this->m_publicKey != nullptr;
 }
 
@@ -48,7 +48,7 @@ bool Friend::GetUuid(uuid_t o_uuidBuff) {
 	return this->m_uuid.Serialize(o_uuidBuff, sizeof(uuid_t));
 }
 
-std::string Friend::GetName() { 
+std::string Friend::GetName() const { 
 	uint8_t tmpNameBuffer[MAX_NAME_BUFFER_SIZE] = { 0 };
 	this->m_name.Serialize(tmpNameBuffer, sizeof(name_t));
 
@@ -58,32 +58,32 @@ std::string Friend::GetName() {
 
 RSAPublicWrapper* Friend::GetPublicKey() { 
 
-	return m_publicKey; 
+	return this->m_publicKey;
 }
 
 AESWrapper* Friend::GetSymKey() { 
 	
-	if (m_symkey != nullptr) {
-		return m_symkey;
+	if (this->m_symkey != nullptr) {
+		return this->m_symkey;
 	}
 
-	m_symkey = new AESWrapper();
+	this->m_symkey = new AESWrapper();
 	
-	return m_symkey; 
+	return this->m_symkey;
 }
 
 void Friend::SetPublicKey(const publicKey_t key) {
-	if (m_publicKey != nullptr) {
+	if (this->m_publicKey != nullptr) {
 		return;
 	}
 
-	m_publicKey = new RSAPublicWrapper((char*)key, sizeof(publicKey_t));
+	this->m_publicKey = new RSAPublicWrapper((char*)key, sizeof(publicKey_t));
 }
 
 void Friend::SetSymKey(const unsigned char* key, size_t keyLen) {
-	if (m_symkey != nullptr) {
+	if (this->m_symkey != nullptr) {
 		return;
 	}
 
-	m_symkey = new AESWrapper(key, keyLen);
+	this->m_symkey = new AESWrapper(key, keyLen);
 }

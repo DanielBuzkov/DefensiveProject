@@ -5,6 +5,7 @@
 static constexpr uint8_t CLIENT_VERSION = 1;
 
 static constexpr size_t PUBLIC_KEY_LENGTH = 160;
+static constexpr size_t SYM_KEY_LENGTH = 16;
 
 // The current RSA encryption uses modulu with 1024 bits,
 // thus the output should be 128 bytes.

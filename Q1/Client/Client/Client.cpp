@@ -93,7 +93,7 @@ void Client::Run(){
 			break;
 
 		case Client::MenuOptions::Exit:
-			// Close socket and free shit
+			// End the program and de-allocate memory in d'tor.
 			return;
 
 		default:
@@ -112,7 +112,7 @@ void Client::Run(){
 
 //-------------------------------------------- UTILITIES --------------------------------------------
 
-void const Client::PrintOption() {
+void Client::PrintOption() {
 	std::cout << "10) Register" << std::endl;
 	std::cout << "20) Request for client list" << std::endl;
 	std::cout << "30) Request for public key" << std::endl;
@@ -123,7 +123,7 @@ void const Client::PrintOption() {
 	std::cout << " 0) Exit client" << std::endl;
 }
 
-const Client::MenuOptions Client::GetMenuChoise() {
+Client::MenuOptions Client::GetMenuChoise() const {
 
 	uint16_t userInput = 0;
 
@@ -564,17 +564,6 @@ Client::ReturnStatus Client::HandleWaitingMessages() {
 		bytesLeft -= MessageHeader::GetSize();
 		bytesRead += MessageHeader::GetSize();
 
-		for (auto i = 0; i < 16; i++) {
-			if (i > 0 && i % 8 == 0) {
-				printf("\n");
-			}
-
-			printf("0x%02x, ", currHeader.uuid[i]);
-		}
-
-		printf("\n\n");
-
-
 		// Get friend name from UUID
 		std::string clientName = GetNameFromUuid(currHeader.uuid);
 
@@ -662,14 +651,10 @@ Client::ReturnStatus Client::HandleSendMessage() {
 	}
 
 	std::cout << "Insert message to send: ";
-	std::cin >> message;
 
-	if (std::cin.fail()) {
-		std::cin.clear();
-		std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-		std::cout << "Bad entry" << std::endl;
-		return Client::ReturnStatus::GeneralError;
-	}
+	// Clearing the buffer for a string read.
+	std::cin.ignore();
+	std::getline(std::cin, message);
 
 	// Making sure a message can even be encrypted.
 	if (this->m_data[name]->HasSym() != true) {
@@ -736,6 +721,7 @@ Client::ReturnStatus Client::HandleSendSymKey(){
 	std::cout << "Insert destenation name: ";
 	std::cin >> name;
 
+	// Won't request sym key from client who's UUID can not be extracted.
 	if (this->m_data.find(name) == this->m_data.end()) {
 		std::cout << "Username not found" << std::endl;
 		return Client::ReturnStatus::GeneralError;
@@ -746,21 +732,27 @@ Client::ReturnStatus Client::HandleSendSymKey(){
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	if (this->m_data[name]->HasPuiblic() != true) {
+	if (this->m_data[name]->HasPublic() != true) {
 		std::cout << "Ask for public key first!" << std::endl;
 		return Client::ReturnStatus::GeneralError;
 	}
 
-	AESWrapper* symKey = this->m_data[name]->GetSymKey();
-	memcpy((char*)&request.body.content, symKey->getKey(), 16);
+	try {
+		AESWrapper* symKey = this->m_data[name]->GetSymKey();
+		memcpy((char*)&request.body.content, symKey->getKey(), SYM_KEY_LENGTH);
 
-	std::string cipher = this->m_data[name]->GetPublicKey()->encrypt((char*)&request.body.content, 16);
-	memcpy((char*)&request.body.content, cipher.c_str(), request.body.messageHeader.contentSize);
+		std::string cipher = this->m_data[name]->GetPublicKey()->encrypt((char*)&request.body.content, SYM_KEY_LENGTH);
+		memcpy((char*)&request.body.content, cipher.c_str(), request.body.messageHeader.contentSize);
+	}
+	catch (...) {
+		std::cout << "Failed encrypting symetric key" << std::endl;
+		return Client::ReturnStatus::GeneralError;
+	}
 
 	return Exchange(request, response);
 }
 
-const Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec) {
+Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec) const {
 
 	BaseResponseHeader tempHeader;
 	responseVec.clear();

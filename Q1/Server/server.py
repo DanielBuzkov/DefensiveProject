@@ -1,14 +1,14 @@
-#Server version 2
+#Server version 1
 
 import socket
 import os
 import threading
 
-from utils.sql_handler import SqlHandler
 from client_handler import ClientHandler
 
 PORT_FILE_PATH = "port.info"
 MAX_PORT_VALUE = 65535
+DEFAULT_IP = "0.0.0.0"
 
 '''
 	The function will raise an exception upon failure which will not be
@@ -38,13 +38,10 @@ def get_port():
 
 def run_server(port_number: int):
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	sock.bind(("0.0.0.0", port_number))
+	sock.bind((DEFAULT_IP, port_number))
 	sock.listen(50)
 
 	client_handler = ClientHandler()
-	sql_handler = SqlHandler()
-
-	sql_handler.init()
 
 	while True:
 		client_socket, addr = sock.accept()

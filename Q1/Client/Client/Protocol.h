@@ -57,7 +57,7 @@ public:
 		memcpy(&o_vector[0], this, sizeof(BaseRequestHeader));
 	}
 
-//protected:
+protected:
 	uuid_t clientId;
 	uint8_t version;
 	uint16_t code;
@@ -208,14 +208,10 @@ public:
 		return true;
 	}
 };
-#include <iostream>
+
 class DynamicRequest {
 public:
-	DynamicRequest(UUID _uuid, uint16_t _code, std::vector<uint8_t>& _payload) : header(_uuid, _code, _payload.size()), payload(_payload) {
-		std::cout << "_payload.size() : " << _payload.size() << std::endl;
-		std::cout << "payload.size() : " << payload.size() << std::endl;
-
-	}
+	DynamicRequest(UUID _uuid, uint16_t _code, std::vector<uint8_t>& _payload) : header(_uuid, _code, _payload.size()), payload(_payload) {}
 
 	const void Serialize(std::vector<uint8_t>& o_vector) const {
 		o_vector.resize(sizeof(header));
@@ -224,7 +220,7 @@ public:
 		o_vector.insert(o_vector.end(), payload.begin(), payload.end());
 	}
 
-//private:
+private:
 	BaseRequestHeader header;
 	std::vector<uint8_t> payload;
 };
@@ -236,8 +232,6 @@ typedef StaticRequest<Opcode::RequestList, EmptyBody> RequestList;
 typedef StaticRequest<Opcode::RequestPK, RequestPKBody> RequestPK;
 typedef StaticRequest<Opcode::RequestSendMessage, RequestGetSymKeyBody> RequestGetSymKey;
 typedef StaticRequest<Opcode::RequestSendMessage, RequestSendSymKeyBody> RequestSendSymKey;
-//typedef StaticRequest<Opcode::RequestSendMessage, RequestSendTextMessageBody> RequestSendTextMessageBody;
-
 typedef StaticRequest<Opcode::RequestGetMessages, EmptyBody> RequestGetMessages;
 
 typedef StaticResponse<Opcode::ResponseRegister, ResponseRegisterBody> ResponseRegister;

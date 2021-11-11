@@ -38,12 +38,12 @@ public:
 	/**
 		@return	bool	-	True if the client has a symetric key with the user, false otherwise.
 	*/
-	bool HasSym();
+	bool HasSym() const;
 	
 	/**
 		@return	bool	-	True if the client has a public key saved, false otherwise.
 	*/
-	bool HasPuiblic();
+	bool HasPublic() const;
 
 	/**
 		This function compares a given UUID to the client's UUID. 
@@ -68,7 +68,7 @@ public:
 
 		@return string	-	The client's name upon success, empty string upon failure.
 	*/
-	std::string GetName();
+	std::string GetName() const;
 
 	/**
 		@return RSAPublicWrapper	-	A pointer to the client's RSAPublicWrapper

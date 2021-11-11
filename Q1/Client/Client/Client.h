@@ -59,7 +59,7 @@ private:
 	/**
 		Prints the entire menu for the user.
 	*/
-	static const void PrintOption();
+	static void PrintOption();
 
 	/**
 		The function prints the menu to the user and gets a choise from him.
@@ -71,7 +71,7 @@ private:
 
 		@return MenuOptions	-	The coresposing enumerate to keep handling the request.
 	*/
-	const MenuOptions GetMenuChoise();
+	MenuOptions GetMenuChoise() const;
 
 	/**
 		The function parses the 'server.info' file by the format:
@@ -109,7 +109,7 @@ private:
 								-	GeneralError otherwise.
 	*/
 	template<Opcode _reqCode, typename ReqBody, Opcode _resCode, typename ResBody>
-	const ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response);
+	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response) const;
 
 	/**
 		A template function for sending a request and receiving a response with unknown length from the server.
@@ -124,7 +124,7 @@ private:
 								-	GeneralError otherwise.
 	*/
 	template<Opcode _reqCode, typename ReqBody>
-	const ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, std::vector<uint8_t>& responseVec);
+	ReturnStatus Exchange(const StaticRequest<_reqCode, ReqBody> request, std::vector<uint8_t>& responseVec) const;
 
 	/**
 		A template function for sending a request of unknown length and receiving a response from the server.
@@ -139,7 +139,7 @@ private:
 								-	GeneralError otherwise.
 	*/
 	template<Opcode _resCode, typename ResBody>
-	const ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, StaticResponse<_resCode, ResBody>& response);
+	ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, StaticResponse<_resCode, ResBody>& response) const;
 
 	/**
 		A template function for sending a request of unknown length and receiving a response 
@@ -153,7 +153,7 @@ private:
 								-	Success if the request has been handled successfuly.
 								-	GeneralError otherwise.
 	*/
-	const ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec);
+	ReturnStatus Exchange(const std::vector<uint8_t>& requestVec, std::vector<uint8_t>& responseVec) const;
 
 	/**
 		The map which holds all the other clients' relevant data is an unordered map
@@ -202,7 +202,7 @@ private:
 };
 
 template<Opcode _reqCode, typename ReqBody, Opcode _resCode, typename ResBody>
-const Client::ReturnStatus Client ::Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response) {
+Client::ReturnStatus Client ::Exchange(const StaticRequest<_reqCode, ReqBody> request, StaticResponse<_resCode, ResBody>& response) const {
 	std::vector<uint8_t> requestVec;
 	request.Serialize(requestVec);
 
@@ -210,7 +210,7 @@ const Client::ReturnStatus Client ::Exchange(const StaticRequest<_reqCode, ReqBo
 }
 
 template<Opcode _reqCode, typename ReqBody>
-const Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> request, std::vector<uint8_t>& responseVec) {
+Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBody> request, std::vector<uint8_t>& responseVec) const {
 	std::vector<uint8_t> requestVec;
 	request.Serialize(requestVec);
 
@@ -218,7 +218,7 @@ const Client::ReturnStatus Client::Exchange(const StaticRequest<_reqCode, ReqBod
 }
 
 template<Opcode _resCode, typename ResBody>
-const Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, StaticResponse<_resCode, ResBody>& response) {
+Client::ReturnStatus Client::Exchange(const std::vector<uint8_t>& requestVec, StaticResponse<_resCode, ResBody>& response) const {
 
 	std::vector<uint8_t> responseVec;
 

@@ -4,7 +4,8 @@
 #include "Validators.h"
 
 /**
-* This file holds all the payloads of the messages in the communication.
+* This file holds all the payloads of the static messages in the communication.
+* i.e messages whose size can be determined in advance.
 */
 
 // An enum to represent all possible codes for messages between two clients.
@@ -16,7 +17,7 @@ enum class MessageType : uint8_t {
 
 #pragma pack(push, 1)
 
-// REQUESTS:
+// STATIC REQUESTS:
 
 // Opcode 1000
 typedef struct _RequestRegisterBody {

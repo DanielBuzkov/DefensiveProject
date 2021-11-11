@@ -17,12 +17,16 @@ message class as described in python's official 'struct'
 documentation.
 '''
 
-SERVER_VERSION = 2
+SERVER_VERSION = 1
 
 NAME_LEN = 255
+
 PUBLIC_KEY_LEN = 160
 SYM_KEY_LENGTH = 16
+ENCRYPTED_SYM_KEY_LENGTH = 128
+
 UUID_LEN = 16
+MESSAGE_ID_LENGTH = 4
 
 # Header = UUID, version, code, size
 REQ_HEADER_LEN = UUID_LEN + 1 + 2 + 4
@@ -64,7 +68,6 @@ class MessageType(IntEnum):
     GetSK = 1
     SendSK = 2
     Text = 3
-    File = 4
 
     # Implementing an easy search function for enums.
     @classmethod
@@ -199,21 +202,7 @@ class GetPKResBody:
 
 #  OPCODE 2003
 class SendMessageResBody:
-    format = f"<{UUID_LEN}sL"
+    format = f"<{UUID_LEN}s{MESSAGE_ID_LENGTH}s"
 
     def __init__(self, client_id, message_id):
         self.raw = struct.pack(self.format, client_id, message_id)
-
-
-#  OPCODE 2004
-class GetMessagesResBody:
-    format = f"<{UUID_LEN}sLBL"
-
-    def __init__(self, bytestream):
-        (self.client_id,
-         self.message_id,
-         self.message_type,
-         self.message_size) = struct.unpack(self.format, bytestream)
-
-        metadata_size = len(self.client_id) + len(self.message_id) + len(self.message_type) + len(self.message_size)
-        self.content = bytestream[metadata_size: metadata_size + self.message_size]

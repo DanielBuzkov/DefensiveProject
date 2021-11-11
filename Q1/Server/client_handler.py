@@ -1,9 +1,10 @@
-from threading import Thread, Lock
-from utils.protocol import *
+from threading import Lock
+from protocol import *
 import uuid
 import socket
+import secrets
 
-
+# This class represents the relevant data of a single client.
 class ClientData:
     def __init__(self, name, public_key):
         self.name = name
@@ -11,11 +12,13 @@ class ClientData:
         self.recv_messages = []
 
 
+# This class handlers a client request.
 class ClientHandler:
     def __init__(self):
         self.mutex = Lock()
         self.users = {}
 
+    # A decorator to lock and free the mutex, preventing race conditioning.
     def locker(func):
         def inner(self, *args, **kwargs):
             self.mutex.acquire()
@@ -29,8 +32,14 @@ class ClientHandler:
 
     #------------------------------------------- UTILS -------------------------------------------
 
+    '''
+        The following function are very basic, and are designed to narrow down
+        the access to the shared `self.users` memory.
+        
+        Each function is very simple and is described by it's name.
+    '''
     @locker
-    def is_registered(self, client_id : UUID):
+    def is_registered(self, client_id: UUID):
         return client_id in self.users
 
     @locker
@@ -42,40 +51,45 @@ class ClientHandler:
         return False
 
     @locker
-    def add_user(self, client : ClientData, uuid : UUID):
+    def add_user(self, client: ClientData, uuid: UUID):
         if uuid not in self.users:
             self.users[uuid] = client
 
     @locker
-    def get_pk_from_uuid(self, uuid : UUID):
+    def get_pk_from_uuid(self, uuid: UUID):
         return self.users[uuid].public_key
 
     @locker
-    def push_message(self, uuid : UUID, message : SendMessageReqBody):
+    def push_message(self, uuid: UUID, message: SendMessageReqBody):
         self.users[uuid].recv_messages.append(message)
 
     @locker
-    def get_name_from_uuid(self, uuid : UUID):
+    def get_name_from_uuid(self, uuid: UUID):
         return self.users[uuid].name
 
     @locker
-    def get_messages_from_uuid(self, uuid : UUID):
+    def get_messages_from_uuid(self, uuid: UUID):
         send_buffer = bytes()
-
         for message in self.users[uuid].recv_messages:
             send_buffer += message.raw
 
         self.users[uuid].recv_messages.clear()
-
         return send_buffer
 
-    def is_sender_valid(self, header : RequestHeader):
+    '''
+        This function makes sure that a request received from some client is valid.
+        It returns True if the client is valid, False otherwise.
+    '''
+    def is_sender_valid(self, header: RequestHeader):
         if header.code != Opcodes.RegisterReq and self.is_registered(UUID(bytes=header.client_id)) is False:
             return False
 
         return True
 
-    def send_error(self, client_sock : socket):
+    '''
+        This function builds and sends an error message to the client.
+    '''
+    def send_error(self, client_sock: socket):
         response = ResponseHeader()
         client_sock.send(response.raw)
 
@@ -89,6 +103,7 @@ class ClientHandler:
             print("User name exits")
             return None
 
+        # Keep getting new UUID until a unique one is generated.
         new_id = uuid.uuid1()
         while self.is_registered(new_id):
             new_id = uuid.uuid1()
@@ -99,41 +114,55 @@ class ClientHandler:
         return response.raw
 
     def handle_user_list(self, client_uuid):
-        # This handler doesn't need body data, thus no parsing is needed.
         send_buffer = bytes()
 
         for uuid in self.users:
+            # Not including the request sender itself.
             if uuid == UUID(bytes=client_uuid):
                 continue
+
             send_buffer += UserListResNode(uuid, self.get_name_from_uuid(uuid)).raw
 
         return send_buffer
 
     def handle_get_public_key(self, payload):
         body = GetPKReqBody(payload)
+
+        if not self.is_registered(UUID(bytes=body.client_id)):
+            print("Request for unregistered user")
+            return None
+
         response = GetPKResBody(body.client_id, self.get_pk_from_uuid(UUID(bytes=body.client_id)))
 
         return response.raw
 
     def handle_send_message(self, payload, uuid):
         body = SendMessageReqBody(payload)
-        # TODO : Generate Message ID
-        response = SendMessageResBody(body.client_id, 69)
+
+        if not self.is_registered(UUID(bytes=body.client_id)):
+            print("Request for unregistered user")
+            return None
+
+        response = SendMessageResBody(body.client_id, secrets.token_bytes(MESSAGE_ID_LENGTH))
 
         if body.content_size != (len(payload) - body.get_sub_header_size()):
+            print("Content size field doesn't match actual size")
             return None
 
         # Saving only valid messages.
         if not MessageType.contains(body.message_type):
+            print("Message type is invalid")
             return None
 
         # Validating logical relation of the size and the content.
         if (body.message_type == MessageType.GetSK and
             body.content_size != 0):
+            print("Unexpected size field for 'GetSymKey' request")
             return None
 
         elif (body.message_type == MessageType.SendSK and
-            body.content_size != 128):
+            body.content_size != ENCRYPTED_SYM_KEY_LENGTH):
+            print("Unexpected size field for 'SendSymKey' request")
             return None
 
         # Switching id's, so the message itself will contain the sender's id
@@ -141,7 +170,6 @@ class ClientHandler:
         body.client_id = uuid
 
         body.update()
-
         self.push_message(UUID(bytes=dest_id), body)
 
         return response.raw
@@ -149,13 +177,15 @@ class ClientHandler:
     def handle_get_messages(self, uuid):
         return self.get_messages_from_uuid(UUID(bytes=uuid))
 
-    def handle_client_thread(self, client_socket : socket):
+    #-------------------------------------- MAIN CLASS FUNCTION --------------------------------------
+
+    def handle_client_thread(self, client_socket: socket):
         try:
             self.handle_client(client_socket)
         finally:
             client_socket.close()
 
-    def handle_client(self, client_socket : socket):
+    def handle_client(self, client_socket: socket):
         # Validate header:
         data = client_socket.recv(REQ_HEADER_LEN)
 
@@ -208,14 +238,11 @@ class ClientHandler:
 
             else:
                 self.send_error(client_socket)
-                print("Invalid option")
                 return
 
             if response_body is None:
                 self.send_error(client_socket)
-                print("Handling failed")
             else:
-                print("All good in the hood")
                 response_header = ResponseHeader(code=response_opcode, payload_size=len(response_body))
                 client_socket.send(response_header.raw + bytes(response_body))
 
